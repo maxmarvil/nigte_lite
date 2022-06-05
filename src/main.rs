@@ -2,18 +2,15 @@
 #![no_main]
 #![deny(warnings)]
 
-extern crate cortex_m;
-extern crate cortex_m_rt as rt;
-extern crate panic_semihosting;
-extern crate rtic;
-extern crate stm32g0xx_hal as hal;
-
 //use cortex_m_semihosting::hprintln;
-use hal::exti;
+
+extern crate panic_semihosting;
 
 #[rtic::app(device = hal::stm32, peripherals = true, dispatchers = [CEC])]
 mod app {
+    use stm32g0xx_hal as hal;
     use cortex_m::asm;
+    use hal::exti;
     //use hal::cortex_m::asm::delay;
     //use hal::exti::Event;
     //use hal::gpio::gpioa::{ PA12};
@@ -23,7 +20,6 @@ mod app {
     use hal::timer::{pwm, Timer, Channel4, delay::Delay};
     use hal::gpio::{ SignalEdge};
     use rtt_target::{rprintln, rtt_init_print};
-    use super::*;
 
     #[shared]
     struct Shared {
@@ -32,12 +28,12 @@ mod app {
         tim_ower: Timer<stm32::TIM17>,
         led: pwm::PwmPin<stm32::TIM1, Channel4>,//PA12<Output<PushPull>>,
         pwm_max: u16,
-        delay: Delay<SYST>,
     }
 
     #[local]
     struct Local {
         exti: stm32::EXTI,
+        delay: Delay<SYST>,
     }
 
     #[init]
@@ -66,10 +62,10 @@ mod app {
                 tim_ower,
                 led: pwm_ch4,
                 pwm_max,
-                delay
             },
             Local {
                 exti,
+                delay
             },
             init::Monotonics(),
         )
@@ -90,7 +86,7 @@ mod app {
             });
 
         } else {
-            (tim_ower).lock(|tim_ower| {
+            tim_ower.lock(|tim_ower| {
                 fade_out::spawn().unwrap();
                 tim_ower.reset();
                 tim_ower.clear_irq();
@@ -133,32 +129,34 @@ mod app {
         exti.unpend(exti::Event::GPIO12);
     }
 
-    #[task(priority = 4, shared=[led, pwm_max, delay])]
+    #[task(priority = 4, local=[delay], shared=[led, pwm_max])]
     fn fade_in(ctx: fade_in::Context) {
-        let led = ctx.shared.led;
-        let delay = ctx.shared.delay;
+        let mut led = ctx.shared.led;
+        //let delay = ctx.local.delay;
         let mut pwm_max = ctx.shared.pwm_max;
         let max  = pwm_max.lock(|pwm_max| *pwm_max);
-        (delay, led).lock(|delay, led| {
-            for val in 0 .. 100 {
-                delay.delay(200.ms());
+
+        for val in 0 .. 100 {
+            //delay.delay(2000.ms());
+            ( led).lock(|led| {
                 led.set_duty((max*val) / 100);
-            }
-        });
+            });
+        }
     }
 
-    #[task(priority = 4, shared=[led, pwm_max, delay])]
+    #[task(priority = 4, shared=[led, pwm_max])]
     fn fade_out(ctx: fade_out::Context) {
-        let led = ctx.shared.led;
-        let delay = ctx.shared.delay;
+        let mut led = ctx.shared.led;
+        //let delay = ctx.local.delay;
         let mut pwm_max = ctx.shared.pwm_max;
         let max  = pwm_max.lock(|pwm_max| *pwm_max);
-        (delay, led).lock(|delay,led| {
-            for  val in 100 .. 0 {
-                    delay.delay(100.ms());
-                    led.set_duty((max*val) / 100);
-            }
-        });
+        //delay.delay(100.ms());
+
+        for  val in 100 .. 0 {
+            ( led).lock(|led| {
+               led.set_duty((max*val) / 100);
+            });
+        }
     }
 
     #[idle]
