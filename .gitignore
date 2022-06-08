@@ -3,6 +3,7 @@
 .gdb_history
 Cargo.lock
 target/
+.idea/
 
 # editor files
 .vscode/*
@@ -11,3 +12,4 @@ target/
 !.vscode/launch.json
 !.vscode/tasks.json
 !.vscode/extensions.json
+nigte_lite.iml
