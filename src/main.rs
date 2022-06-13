@@ -9,9 +9,9 @@ use rtt_target::{rprintln, rtt_init_print};
 use stm32g0xx_hal::{ prelude::*, stm32, analog::adc::{OversamplingRatio, Precision, SampleTime}};
 use stm32g0xx_hal::rcc::{Config, Prescaler};
 //use stm32g0xx_hal::rcc::SysClockSrc;
-use stm32g0xx_hal::stm32::TIM1;
+use stm32g0xx_hal::stm32::TIM3;
 use stm32g0xx_hal::stm32::TIM14;
-use stm32g0xx_hal::timer::Channel2;
+use stm32g0xx_hal::timer::Channel3;
 use stm32g0xx_hal::timer::delay::Delay;
 use stm32g0xx_hal::timer::pwm::PwmPin;
 
@@ -39,7 +39,7 @@ fn main() -> ! {
     let mut timer = dp.TIM16.timer(&mut rcc);
     let gpioa = dp.GPIOA.split(&mut rcc);
     let gpiob = dp.GPIOB.split(&mut rcc);
-    let pwm = dp.TIM1.pwm(10.khz(), &mut rcc);
+    let pwm = dp.TIM3.pwm(10.khz(), &mut rcc);
 
     //let gpioc = dp.GPIOC.split(&mut rcc);
     let mut pwm_pin = pwm.bind_pin(gpiob.pb0);
@@ -98,8 +98,8 @@ fn main() -> ! {
     }
 }
 
-fn led_on (delay: &mut Delay<TIM14>,  pin: &mut PwmPin<TIM1, Channel2>) {
-    let max:u16 =  pin.get_max_duty();
+fn led_on (delay: &mut Delay<TIM14>,  pin: &mut PwmPin<TIM3, Channel3>) {
+    let max =  pin.get_max_duty();
     rprintln!("led_on max {}", max);
     delay.delay(5.ms());
     for pr in 0..100 {
@@ -109,8 +109,8 @@ fn led_on (delay: &mut Delay<TIM14>,  pin: &mut PwmPin<TIM1, Channel2>) {
     }
 }
 
-fn led_off ( delay:&mut Delay<TIM14>, pin:&mut  PwmPin<TIM1, Channel2>) {
-    let max:u16 = pin.get_max_duty();
+fn led_off ( delay:&mut Delay<TIM14>, pin:&mut  PwmPin<TIM3, Channel3>) {
+    let max = pin.get_max_duty();
     rprintln!("led_off max {}", max);
     delay.delay(5.ms());
     for pr in 0..100 {
