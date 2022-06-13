@@ -8,6 +8,7 @@ use cortex_m_rt::entry;
 use rtt_target::{rprintln, rtt_init_print};
 use stm32g0xx_hal::{ prelude::*, stm32, analog::adc::{OversamplingRatio, Precision, SampleTime}};
 use stm32g0xx_hal::rcc::Config;
+use stm32g0xx_hal::rcc::SysClockSrc;
 use stm32g0xx_hal::stm32::TIM1;
 use stm32g0xx_hal::stm32::TIM14;
 use stm32g0xx_hal::timer::Channel2;
@@ -21,7 +22,7 @@ fn main() -> ! {
     rprintln!("start");
     //let cp = cortex_m::Peripherals::take().expect("cannot take core peripherals");
     let dp = stm32::Peripherals::take().expect("cannot take peripherals");
-    let mut rcc = dp.RCC.freeze(Config::lsi());
+    let mut rcc = dp.RCC.freeze(Config::new(SysClockSrc::PLL));//Config::lsi()
     let mut adc = dp.ADC.constrain(&mut rcc);
     let mut delay = dp.TIM14.delay(&mut rcc);
 
@@ -38,7 +39,7 @@ fn main() -> ! {
     let mut timer = dp.TIM16.timer(&mut rcc);
     let gpioa = dp.GPIOA.split(&mut rcc);
     let gpiob = dp.GPIOB.split(&mut rcc);
-    let pwm = dp.TIM1.pwm(10.khz(), &mut rcc);
+    let pwm = dp.TIM1.pwm(255.hz(), &mut rcc);
 
     //let gpioc = dp.GPIOC.split(&mut rcc);
     let mut pwm_pin = pwm.bind_pin(gpiob.pb0);
@@ -50,6 +51,7 @@ fn main() -> ! {
     let mut timer_need_start = false;
     let mut timer_started = false;
     //timer.start(timeout.ms());
+
     let max = pwm_pin.get_max_duty();
     rprintln!("pwm {}", max);
     //let mut opto_pin = gpioc.pc14.into_analog();
@@ -82,8 +84,6 @@ fn main() -> ! {
             }
             timer_need_start = false;
 
-            rprintln!("timer down {}", timer.get_current());
-
             if timer.wait().is_ok() {
                 // новый цикл таймера
                 rprintln!("timer is ok");
@@ -99,23 +99,25 @@ fn main() -> ! {
 }
 
 fn led_on (delay: &mut Delay<TIM14>,  pin: &mut PwmPin<TIM1, Channel2>) {
-    let max:u16 = pin.get_max_duty();
+    let max:u16 =  pin.get_max_duty();
     rprintln!("led_on max {}", max);
+    delay.delay(5.ms());
     for pr in 0..100 {
-        delay.delay(10.ms());
-        rprintln!("led_on duty {}", (max*pr)/100);
-        pin.set_duty((max*pr)/100);
+        delay.delay(5.ms());
+        rprintln!("led_on duty {}", (max/100)*pr);
+        pin.set_duty((max/100)*pr);
     }
 }
 
 fn led_off ( delay:&mut Delay<TIM14>, pin:&mut  PwmPin<TIM1, Channel2>) {
     let max:u16 = pin.get_max_duty();
     rprintln!("led_off max {}", max);
+    delay.delay(5.ms());
     for pr in 0..100 {
         let re_pr = 100 - pr;
-        delay.delay(10.ms());
-        rprintln!("led_off duty {}", (max*re_pr)/100);
-        pin.set_duty((max*re_pr)/100);
+        delay.delay(5.ms());
+        rprintln!("led_off duty {}", (max/100)*re_pr);
+        pin.set_duty((max/100)*re_pr);
     }
 
 }
