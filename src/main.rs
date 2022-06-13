@@ -36,7 +36,7 @@ fn main() -> ! {
     //let gpioc = dp.GPIOC.split(&mut rcc);
     let mut led = gpioa.pa11.into_push_pull_output();
     let pir = gpioa.pa12.into_pull_down_input();
-    let mut opto_pin = gpiob.pb8.into_analog();
+    let mut opto_pin = gpiob.pb7.into_analog();
     //pir.listen(SignalEdge.Rising, );
     let mut preview_pir_status = false;
     let mut timer_need_start = false;
@@ -48,7 +48,9 @@ fn main() -> ! {
         let pir_status = pir.is_high().unwrap();
         let opto_data = adc.read_voltage(&mut opto_pin).unwrap();
 
-        rprintln!("opto read data {}", opto_data);
+        if opto_data>15 {
+            continue;
+        }
         if pir_status {
             if preview_pir_status == false {
 
