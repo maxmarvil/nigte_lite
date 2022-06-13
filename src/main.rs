@@ -7,8 +7,8 @@ extern crate panic_semihosting;
 use cortex_m_rt::entry;
 use rtt_target::{rprintln, rtt_init_print};
 use stm32g0xx_hal::{ prelude::*, stm32, analog::adc::{OversamplingRatio, Precision, SampleTime}};
-use stm32g0xx_hal::rcc::Config;
-use stm32g0xx_hal::rcc::SysClockSrc;
+use stm32g0xx_hal::rcc::{Config, Prescaler};
+//use stm32g0xx_hal::rcc::SysClockSrc;
 use stm32g0xx_hal::stm32::TIM1;
 use stm32g0xx_hal::stm32::TIM14;
 use stm32g0xx_hal::timer::Channel2;
@@ -22,7 +22,7 @@ fn main() -> ! {
     rprintln!("start");
     //let cp = cortex_m::Peripherals::take().expect("cannot take core peripherals");
     let dp = stm32::Peripherals::take().expect("cannot take peripherals");
-    let mut rcc = dp.RCC.freeze(Config::new(SysClockSrc::PLL));//Config::lsi()
+    let mut rcc = dp.RCC.freeze(Config::hsi(Prescaler::NotDivided));//Config::new(SysClockSrc::PLL)
     let mut adc = dp.ADC.constrain(&mut rcc);
     let mut delay = dp.TIM14.delay(&mut rcc);
 
@@ -39,13 +39,13 @@ fn main() -> ! {
     let mut timer = dp.TIM16.timer(&mut rcc);
     let gpioa = dp.GPIOA.split(&mut rcc);
     let gpiob = dp.GPIOB.split(&mut rcc);
-    let pwm = dp.TIM1.pwm(255.hz(), &mut rcc);
+    let pwm = dp.TIM1.pwm(10.khz(), &mut rcc);
 
     //let gpioc = dp.GPIOC.split(&mut rcc);
     let mut pwm_pin = pwm.bind_pin(gpiob.pb0);
     //let mut led = gpioa.pa11.into_push_pull_output();
     let pir = gpioa.pa12.into_pull_down_input();
-    let mut opto_pin = gpiob.pb7.into_analog();
+    //let mut opto_pin = gpiob.pb7.into_analog();
     //pir.listen(SignalEdge.Rising, );
     let mut preview_pir_status = false;
     let mut timer_need_start = false;
@@ -57,12 +57,12 @@ fn main() -> ! {
     //let mut opto_pin = gpioc.pc14.into_analog();
     loop {
         let pir_status = pir.is_high().unwrap();
-        let opto_data = adc.read_voltage(&mut opto_pin).unwrap();
+        //let opto_data = adc.read_voltage(&mut opto_pin).unwrap();
 
-        if opto_data > 20 {
-            //preview_pir_status = false;
-            //continue;
-        }
+        // if opto_data > 20 {
+        //     //preview_pir_status = false;
+        //     //continue;
+        // }
         //rprintln!("opto data {}", opto_data);
         if pir_status {
             if preview_pir_status == false {
@@ -103,7 +103,7 @@ fn led_on (delay: &mut Delay<TIM14>,  pin: &mut PwmPin<TIM1, Channel2>) {
     rprintln!("led_on max {}", max);
     delay.delay(5.ms());
     for pr in 0..100 {
-        delay.delay(5.ms());
+        delay.delay(10.ms());
         rprintln!("led_on duty {}", (max/100)*pr);
         pin.set_duty((max/100)*pr);
     }
@@ -115,7 +115,7 @@ fn led_off ( delay:&mut Delay<TIM14>, pin:&mut  PwmPin<TIM1, Channel2>) {
     delay.delay(5.ms());
     for pr in 0..100 {
         let re_pr = 100 - pr;
-        delay.delay(5.ms());
+        delay.delay(10.ms());
         rprintln!("led_off duty {}", (max/100)*re_pr);
         pin.set_duty((max/100)*re_pr);
     }
