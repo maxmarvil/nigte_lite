@@ -8,6 +8,11 @@ use cortex_m_rt::entry;
 use rtt_target::{rprintln, rtt_init_print};
 use stm32g0xx_hal::{ prelude::*, stm32, analog::adc::{OversamplingRatio, Precision, SampleTime}};
 use stm32g0xx_hal::rcc::Config;
+use stm32g0xx_hal::stm32::TIM1;
+use stm32g0xx_hal::stm32::TIM14;
+use stm32g0xx_hal::timer::Channel2;
+use stm32g0xx_hal::timer::delay::Delay;
+use stm32g0xx_hal::timer::pwm::PwmPin;
 
 
 #[entry]
@@ -33,8 +38,11 @@ fn main() -> ! {
     let mut timer = dp.TIM16.timer(&mut rcc);
     let gpioa = dp.GPIOA.split(&mut rcc);
     let gpiob = dp.GPIOB.split(&mut rcc);
+    let pwm = dp.TIM1.pwm(10.khz(), &mut rcc);
+
     //let gpioc = dp.GPIOC.split(&mut rcc);
-    let mut led = gpioa.pa11.into_push_pull_output();
+    let mut pwm_pin = pwm.bind_pin(gpiob.pb0);
+    //let mut led = gpioa.pa11.into_push_pull_output();
     let pir = gpioa.pa12.into_pull_down_input();
     let mut opto_pin = gpiob.pb7.into_analog();
     //pir.listen(SignalEdge.Rising, );
@@ -42,20 +50,24 @@ fn main() -> ! {
     let mut timer_need_start = false;
     let mut timer_started = false;
     //timer.start(timeout.ms());
-
+    let max = pwm_pin.get_max_duty();
+    rprintln!("pwm {}", max);
     //let mut opto_pin = gpioc.pc14.into_analog();
     loop {
         let pir_status = pir.is_high().unwrap();
         let opto_data = adc.read_voltage(&mut opto_pin).unwrap();
 
-        if opto_data>15 {
-            continue;
+        if opto_data > 20 {
+            //preview_pir_status = false;
+            //continue;
         }
+        //rprintln!("opto data {}", opto_data);
         if pir_status {
             if preview_pir_status == false {
 
                 rprintln!("pir up");
-                led.set_high().unwrap();
+                led_on( &mut delay, &mut  pwm_pin );
+                //led.set_high().unwrap();
                 preview_pir_status = true;
                 timer_need_start = true;
             }
@@ -75,16 +87,35 @@ fn main() -> ! {
             if timer.wait().is_ok() {
                 // новый цикл таймера
                 rprintln!("timer is ok");
-                led.set_low().unwrap();
+                led_off(&mut delay, &mut pwm_pin );
+                //led.set_low().unwrap();
 
                 timer.reset();
                 timer.clear_irq();
                 preview_pir_status = false;
             }
-
         }
-
-
-
     }
+}
+
+fn led_on (delay: &mut Delay<TIM14>,  pin: &mut PwmPin<TIM1, Channel2>) {
+    let max:u16 = pin.get_max_duty();
+    rprintln!("led_on max {}", max);
+    for pr in 0..100 {
+        delay.delay(10.ms());
+        rprintln!("led_on duty {}", (max*pr)/100);
+        pin.set_duty((max*pr)/100);
+    }
+}
+
+fn led_off ( delay:&mut Delay<TIM14>, pin:&mut  PwmPin<TIM1, Channel2>) {
+    let max:u16 = pin.get_max_duty();
+    rprintln!("led_off max {}", max);
+    for pr in 0..100 {
+        let re_pr = 100 - pr;
+        delay.delay(10.ms());
+        rprintln!("led_off duty {}", (max*re_pr)/100);
+        pin.set_duty((max*re_pr)/100);
+    }
+
 }
