@@ -11,8 +11,9 @@ cortex-m-rt = "0.6.10"
 cortex-m-semihosting = "0.3.3"
 panic-semihosting = "0.5.6"
 panic-probe = { version = "0.2", features = ["print-rtt"] }
-stm32g0xx-hal = { version = "0.1.5", features = ["rt", "stm32g031", "stm32g0x1"] }# For the stm32g031k8 mc git="https://github.com/stm32-rs/stm32g0xx-hal.git", ,
+stm32g0xx-hal = { git="https://github.com/stm32-rs/stm32g0xx-hal.git", features = ["rt", "stm32g031", "stm32g0x1"] }# For the stm32g031k8 mc  ,version = "0.1.5",
 rtt-target =  { version = "0.3.1", features = ["cortex-m"] }
+
 
 # Uncomment for the panic example.
 # panic-itm = "0.4.1"

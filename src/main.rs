@@ -32,44 +32,45 @@ fn main() -> ! {
     adc.set_oversampling_shift(16);
     adc.oversampling_enable(true);
 
-    delay.delay(20.us()); // Wait for ADC voltage regulator to stabilize
+    delay.delay(20.micros()); // Wait for ADC voltage regulator to stabilize
     adc.calibrate();
 
     let timeout = 5000;
     let mut timer = dp.TIM16.timer(&mut rcc);
     let gpioa = dp.GPIOA.split(&mut rcc);
     let gpiob = dp.GPIOB.split(&mut rcc);
-    let pwm = dp.TIM3.pwm(1.khz(), &mut rcc);
+    let pwm = dp.TIM3.pwm(1.kHz(), &mut rcc);
 
-    //let gpioc = dp.GPIOC.split(&mut rcc);
     let mut pwm_pin = pwm.bind_pin(gpiob.pb0);
-    //let mut led = gpioa.pa11.into_push_pull_output();
     let pir = gpioa.pa12.into_pull_down_input();
-    //let mut opto_pin = gpiob.pb7.into_analog();
-    //pir.listen(SignalEdge.Rising, );
+    let mut opto_pin = gpiob.pb7.into_analog(); // opto-transistor temt6000
     let mut preview_pir_status = false;
     let mut timer_need_start = false;
     let mut timer_started = false;
-    //timer.start(timeout.ms());
+    let mut led_on_status = false;
+
     pwm_pin.enable();
     let max = pwm_pin.get_max_duty();
     rprintln!("pwm {}", max);
-    //let mut opto_pin = gpioc.pc14.into_analog();
+
     loop {
         let pir_status = pir.is_high().unwrap();
-        //let opto_data = adc.read_voltage(&mut opto_pin).unwrap();
+        let opto_data = adc.read_voltage(&mut opto_pin).unwrap();
 
-        // if opto_data > 20 {
-        //     //preview_pir_status = false;
-        //     //continue;
-        // }
-        //rprintln!("opto data {}", opto_data);
+        rprintln!("opto data {}", opto_data);
+
+        if opto_data > 20 && led_on_status == false {
+            preview_pir_status = false;
+            timer_need_start = false;
+            continue;
+        }
+
         if pir_status {
             if preview_pir_status == false {
 
                 rprintln!("pir up");
                 led_on( &mut delay, &mut  pwm_pin );
-                //led.set_high().unwrap();
+                led_on_status = true;
                 preview_pir_status = true;
                 timer_need_start = true;
             }
@@ -80,7 +81,7 @@ fn main() -> ! {
 
             if timer_need_start {
                 timer_started = true;
-                timer.start(timeout.ms());
+                timer.start(timeout.millis());
             }
             timer_need_start = false;
 
@@ -88,8 +89,7 @@ fn main() -> ! {
                 // новый цикл таймера
                 rprintln!("timer is ok");
                 led_off(&mut delay, &mut pwm_pin );
-                //led.set_low().unwrap();
-
+                led_on_status = false;
                 timer.reset();
                 timer.clear_irq();
                 preview_pir_status = false;
@@ -101,9 +101,8 @@ fn main() -> ! {
 fn led_on (delay: &mut Delay<TIM14>,  pin: &mut PwmPin<TIM3, Channel3>) {
     let max =  pin.get_max_duty();
     rprintln!("led_on max {}", max);
-    delay.delay(5.ms());
     for pr in 0..100 {
-        delay.delay(10.ms());
+        delay.delay(10.millis());
         pin.set_duty(max*pr/100);
     }
     pin.set_duty(max);
@@ -112,10 +111,9 @@ fn led_on (delay: &mut Delay<TIM14>,  pin: &mut PwmPin<TIM3, Channel3>) {
 fn led_off ( delay:&mut Delay<TIM14>, pin:&mut  PwmPin<TIM3, Channel3>) {
     let max = pin.get_max_duty();
     rprintln!("led_off max {}", max);
-    delay.delay(5.ms());
     for pr in 0..100 {
         let re_pr = 100 - pr;
-        delay.delay(10.ms());
+        delay.delay(10.millis());
         pin.set_duty(max*re_pr/100);
     }
     pin.set_duty(0);
