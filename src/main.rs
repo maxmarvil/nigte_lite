@@ -39,7 +39,7 @@ fn main() -> ! {
     let mut timer = dp.TIM16.timer(&mut rcc);
     let gpioa = dp.GPIOA.split(&mut rcc);
     let gpiob = dp.GPIOB.split(&mut rcc);
-    let pwm = dp.TIM3.pwm(10.khz(), &mut rcc);
+    let pwm = dp.TIM3.pwm(1.khz(), &mut rcc);
 
     //let gpioc = dp.GPIOC.split(&mut rcc);
     let mut pwm_pin = pwm.bind_pin(gpiob.pb0);
@@ -51,7 +51,7 @@ fn main() -> ! {
     let mut timer_need_start = false;
     let mut timer_started = false;
     //timer.start(timeout.ms());
-
+    pwm_pin.enable();
     let max = pwm_pin.get_max_duty();
     rprintln!("pwm {}", max);
     //let mut opto_pin = gpioc.pc14.into_analog();
@@ -104,9 +104,9 @@ fn led_on (delay: &mut Delay<TIM14>,  pin: &mut PwmPin<TIM3, Channel3>) {
     delay.delay(5.ms());
     for pr in 0..100 {
         delay.delay(10.ms());
-        rprintln!("led_on duty {}", (max/100)*pr);
-        pin.set_duty((max/100)*pr);
+        pin.set_duty(max*pr/100);
     }
+    pin.set_duty(max);
 }
 
 fn led_off ( delay:&mut Delay<TIM14>, pin:&mut  PwmPin<TIM3, Channel3>) {
@@ -116,8 +116,8 @@ fn led_off ( delay:&mut Delay<TIM14>, pin:&mut  PwmPin<TIM3, Channel3>) {
     for pr in 0..100 {
         let re_pr = 100 - pr;
         delay.delay(10.ms());
-        rprintln!("led_off duty {}", (max/100)*re_pr);
-        pin.set_duty((max/100)*re_pr);
+        pin.set_duty(max*re_pr/100);
     }
+    pin.set_duty(0);
 
 }
