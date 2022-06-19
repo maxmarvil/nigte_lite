@@ -47,7 +47,7 @@ mod app {
     fn init(ctx: init::Context) -> (Shared, Local, init::Monotonics) {
         let mut rcc = ctx.device.RCC.constrain();
 
-        let mono = Systick::new(ctx.core.SYST, 36_000_000);
+            let mono = Systick::new(ctx.core.SYST, 36_000_000);
 
         let gpioa = ctx.device.GPIOA.split(&mut rcc);
         let gpiob = ctx.device.GPIOB.split(&mut rcc);
@@ -66,7 +66,7 @@ mod app {
         pwm_ch2.set_duty(0);
         pir.listen(SignalEdge::All, &mut exti);
         let pwm_max = pwm_ch2.get_max_duty();
-        let handler = fade_out::spawn_after(Duration::<u64, 1, 1000>::from_ticks(1000)).unwrap();
+        //let handler = fade_out::spawn_after(Duration::<u64, 1, 1000>::from_ticks(10)).unwrap();
 
         (
             Shared {
@@ -76,7 +76,7 @@ mod app {
                 pwm_max,
                 delay,
                 led_status: false,
-                fade_out_handle: Some(handler),
+                fade_out_handle: None,
                 fade_order: false
             },
             Local {
@@ -111,7 +111,7 @@ mod app {
     //     }
     // }
 
-    #[task(binds = EXTI4_15, priority = 2, local = [exti], shared=[pir_status, trigger, fade_out_handle, fade_order])]
+    #[task(binds = EXTI4_15, priority = 2, local = [exti], shared=[pir_status, fade_out_handle, fade_order])]
     fn pir_signal(ctx: pir_signal::Context) {
         //let mut trigger = ctx.shared.trigger;
         let mut pir_status = ctx.shared.pir_status;
@@ -130,11 +130,16 @@ mod app {
         });
 
         if status {
+
             fade_in::spawn().unwrap();
             if fade_order_status {
                 fade_out_handle.lock(|fade_out_h| {
+                    rprintln!("fade_out_handle ");
                     match fade_out_h.take() {
-                        Some(handler) => handler.cancel().unwrap(),
+                        Some(handler) => {
+                            rprintln!("fade_out_handle some take {:?}",handler);
+                            handler.cancel().unwrap();
+                        },
                         None => rprintln!("free handler"),
                     }
                 });
@@ -143,8 +148,8 @@ mod app {
 
         } else if status_fall {
             let handler_new = Some(fade_out::spawn_after(Duration::<u64, 1, 1000>::from_ticks(5000)).unwrap());
-            (fade_out_handle, fade_order).lock(|fade_out_handle, order| {
-                *fade_out_handle = handler_new;
+            (fade_out_handle, fade_order).lock(|fade_out_h, order| {
+                *fade_out_h = handler_new;
                 *order = true;
             });
         }
