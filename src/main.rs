@@ -25,7 +25,7 @@ mod app {
     #[shared]
     struct Shared {
         pir_status: bool,
-        trigger: Option<SignalEdge>,
+        //trigger: Option<SignalEdge>,
         //tim_ower: Timer<stm32::TIM17>,
         led: pwm::PwmPin<stm32::TIM3, Channel3>,//PA12<Output<PushPull>>,
         pwm_max: u32,
@@ -47,14 +47,14 @@ mod app {
     fn init(ctx: init::Context) -> (Shared, Local, init::Monotonics) {
         let mut rcc = ctx.device.RCC.constrain();
 
-            let mono = Systick::new(ctx.core.SYST, 36_000_000);
+            let mono = Systick::new(ctx.core.SYST, 16_000_000);
 
         let gpioa = ctx.device.GPIOA.split(&mut rcc);
         let gpiob = ctx.device.GPIOB.split(&mut rcc);
         let pir = gpioa.pa12.into_pull_down_input();
         let mut tim_ower = ctx.device.TIM17.timer(&mut rcc);
         let pwm = ctx.device.TIM3.pwm(1.khz(), &mut rcc);
-        let trigger = None;
+        //let trigger = None;
         let mut pwm_ch2 = pwm.bind_pin(gpiob.pb0);
         let delay = ctx.device.TIM14.delay(&mut rcc);
 
@@ -71,7 +71,7 @@ mod app {
         (
             Shared {
                 pir_status: false,
-                trigger,
+                //trigger,
                 led: pwm_ch2,
                 pwm_max,
                 delay,
@@ -130,15 +130,17 @@ mod app {
         });
 
         if status {
-
             fade_in::spawn().unwrap();
             if fade_order_status {
                 fade_out_handle.lock(|fade_out_h| {
                     rprintln!("fade_out_handle ");
                     match fade_out_h.take() {
                         Some(handler) => {
-                            rprintln!("fade_out_handle some take {:?}",handler);
-                            handler.cancel().unwrap();
+                            let resp = handler.cancel();
+                            match resp {
+                                Ok(Respon) => rprintln!("handler result {:?}", Respon),
+                                Err(_) => Asm::nop(),
+                            };
                         },
                         None => rprintln!("free handler"),
                     }
@@ -147,6 +149,7 @@ mod app {
             fade_order.lock(|fade_order| { *fade_order = false; } );
 
         } else if status_fall {
+            rprintln!("fail ");
             let handler_new = Some(fade_out::spawn_after(Duration::<u64, 1, 1000>::from_ticks(5000)).unwrap());
             (fade_out_handle, fade_order).lock(|fade_out_h, order| {
                 *fade_out_h = handler_new;
