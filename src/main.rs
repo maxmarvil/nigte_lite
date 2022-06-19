@@ -136,11 +136,9 @@ mod app {
                     rprintln!("fade_out_handle ");
                     match fade_out_h.take() {
                         Some(handler) => {
-                            let resp = handler.cancel();
-                            match resp {
-                                Ok(Respon) => rprintln!("handler result {:?}", Respon),
-                                Err(_) => Asm::nop(),
-                            };
+                            if let Ok(RespOn) = handler.cancel() {
+                                rprintln!("handler result {:?}", RespOn);
+                            }
                         },
                         None => rprintln!("free handler"),
                     }
