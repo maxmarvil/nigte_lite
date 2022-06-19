@@ -31,7 +31,7 @@ mod app {
         pwm_max: u32,
         delay: Delay<TIM14>,
         led_status: bool,
-        fade_out_handle: fade_out::SpawnHandle,
+        fade_out_handle: Option<fade_out::SpawnHandle>,
         fade_order: bool,
     }
 
@@ -76,7 +76,7 @@ mod app {
                 pwm_max,
                 delay,
                 led_status: false,
-                fade_out_handle: handler,
+                fade_out_handle: Some(handler),
                 fade_order: false
             },
             Local {
@@ -132,7 +132,8 @@ mod app {
         if status {
             fade_in::spawn().unwrap();
             if fade_order_status {
-                fade_out_handle.lock(|fade_out_h| { *(fade_out_h).cancel().unwrap(); });
+                fade_out_handle.lock(|fade_out_h| {
+                    fade_out_h.take().cancel().unwrap(); });
             }
             fade_order.lock(|fade_order| { *fade_order = false; } );
 
