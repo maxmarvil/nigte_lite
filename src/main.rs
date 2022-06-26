@@ -32,6 +32,7 @@ mod app {
         led_status: bool,
         fade_out_handle: Option<fade_out::SpawnHandle>,
         fade_order: bool,
+        action_lock: bool,
         adc: Adc,
         opto_pin: PB7<Analog>,//Channel<Adc>,
     }
@@ -92,6 +93,7 @@ mod app {
                 fade_order: false,
                 adc,
                 opto_pin,
+                action_lock: false
             },
             Local {
                 exti,
@@ -127,18 +129,13 @@ mod app {
             rprintln!("fail");
         }
 
-        let opto_data = (adc, opto_pin).lock(|adc, opto_pin| {
-            let data = adc.read_voltage(opto_pin).unwrap();
-            return data
-        });
+        let opto_data = (adc, opto_pin).lock(|adc, opto_pin| adc.read_voltage(opto_pin).unwrap_or(0));
 
         rprintln!("status led-{} opto:{}", status_led, opto_data);
-        if status && opto_data<100 && status_led == false {
+        if status && opto_data<100 {
             fade_in::spawn().unwrap();
             if fade_order_status {
                 fade_out_handle.lock(|fade_out_h| {
-                    rprintln!("fade_out_handle ");
-                    //fade_out_h.take();
                     let taked = fade_out_h.take();
                     rprintln!("tacked {:?}", taked);
                     if let Some(handler_task) = taked{
@@ -172,23 +169,23 @@ mod app {
 
             let handler_new;
 
-            if let Ok(handler) = fade_out::spawn_after() {//Duration::<u64, 1, 1000>::from_ticks(5000)
+            if let Ok(handler) = fade_out::spawn_after(Duration::<u64, 1, 100>::from_ticks(500)) {//Duration::<u64, 1, 1000>::from_ticks(5000)
                 handler_new = Some(handler);
             } else {
                 handler_new = None;
             }
 
 
-            (fade_out_handle, fade_order).lock(|fade_out_h, order| {
-                *fade_out_h = handler_new;
-                *order = true;
+            (fade_out_handle, fade_order).lock(|fade_out_handle, fade_order| {
+                *fade_out_handle = handler_new;
+                *fade_order = true;
             });
         }
 
         exti.unpend(exti::Event::GPIO12);
     }
 
-    #[task(priority = 2, shared=[led, pwm_max, delay, led_status])]
+    #[task(priority = 2, shared=[led, pwm_max, delay, led_status, action_lock])]
     fn fade_in(ctx: fade_in::Context) {
         let mut led = ctx.shared.led;
         let mut led_status = ctx.shared.led_status;
@@ -196,8 +193,17 @@ mod app {
         let mut pwm_max = ctx.shared.pwm_max;
         let max  = pwm_max.lock(|pwm_max| *pwm_max);
         let status  = led_status.lock(|led_status| *led_status);
-        rprintln!("led on");
+
+        let mut action_lock = ctx.shared.action_lock;
+
         if status == false {
+            rprintln!("led on");
+            action_lock.lock(|action_lock|{
+                *action_lock = true;
+            });
+            led_status.lock(|led_status|{
+                *led_status = true;
+            });
             for val in 0 .. 100 {
                 delay.lock(|delay| delay.delay(10.millis()));
                 ( led).lock(|led| {
@@ -207,23 +213,32 @@ mod app {
             ( led).lock(|led| {
                 led.set_duty(max);
             });
-            led_status.lock(|led_status|{
-                *led_status = true;
+            action_lock.lock(|action_lock|{
+                *action_lock = false;
             });
+
         }
     }
 
-    #[task(priority = 2,  shared=[led, pwm_max, delay, led_status,fade_out_handle])]
+    #[task(priority = 2,  shared=[led, pwm_max, delay, led_status,fade_out_handle, action_lock])]
     fn fade_out(ctx: fade_out::Context) {
         let mut led = ctx.shared.led;
         let mut led_status = ctx.shared.led_status;
         let mut delay = ctx.shared.delay;
         let mut pwm_max = ctx.shared.pwm_max;
+        let mut action_lock = ctx.shared.action_lock;
         let max  = pwm_max.lock(|pwm_max| *pwm_max);
         let status  = led_status.lock(|led_status| *led_status);
         let mut fade_out_handle = ctx.shared.fade_out_handle;
-        rprintln!("led off");
+
         if status {
+            rprintln!("led off");
+            action_lock.lock(|action_lock|{
+                *action_lock = true;
+            });
+            led_status.lock(|led_status|{
+                *led_status = false;
+            });
             for val in 0..100 {
                 delay.lock(|delay| delay.delay(10.millis()));
                 let re_pr = 100 - val;
@@ -237,9 +252,10 @@ mod app {
             (led).lock(|led| {
                 led.set_duty(0);
             });
-            led_status.lock(|led_status|{
-                *led_status = false;
+            action_lock.lock(|action_lock|{
+                *action_lock = false;
             });
+
         }
     }
 
