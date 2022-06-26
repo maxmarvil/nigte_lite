@@ -42,7 +42,7 @@ mod app {
     }
 
     #[monotonic(binds = SysTick, default = true)]
-    type MonoTimer = Systick<1000>;
+    type MyMono = Systick<100>;
 
     #[init]
     fn init(ctx: init::Context) -> (Shared, Local, init::Monotonics) {
@@ -100,7 +100,7 @@ mod app {
         )
     }
 
-    #[task(binds = EXTI4_15, priority = 2, local = [exti], shared=[pir_status, fade_out_handle, fade_order, adc, opto_pin, led_status])]
+    #[task(binds = EXTI4_15, priority = 3, local = [exti], shared=[pir_status, fade_out_handle, fade_order, adc, opto_pin, led_status])]
     fn pir_signal(ctx: pir_signal::Context) {
         //let mut trigger = ctx.shared.trigger;
         let mut pir_status = ctx.shared.pir_status;
@@ -120,13 +120,19 @@ mod app {
         pir_status.lock(|pir_status|{
             *pir_status = status;
         });
+        if status {
+            rprintln!("up");
+        }
+        if status_fall {
+            rprintln!("fail");
+        }
 
         let opto_data = (adc, opto_pin).lock(|adc, opto_pin| {
             let data = adc.read_voltage(opto_pin).unwrap();
             return data
         });
 
-        rprintln!("status led-{} opto:{} stat up-{} down-{}", status_led, opto_data, status, status_fall);
+        rprintln!("status led-{} opto:{}", status_led, opto_data);
         if status && opto_data<100 && status_led == false {
             fade_in::spawn().unwrap();
             if fade_order_status {
@@ -163,10 +169,10 @@ mod app {
             fade_order.lock(|fade_order| { *fade_order = false; } );
 
         } else if status_fall && status_led {
-            rprintln!("fail");
+
             let handler_new;
 
-            if let Ok(handler) = fade_out::spawn_after(Duration::<u64, 1, 1000>::from_ticks(5000)) {
+            if let Ok(handler) = fade_out::spawn_after() {//Duration::<u64, 1, 1000>::from_ticks(5000)
                 handler_new = Some(handler);
             } else {
                 handler_new = None;
@@ -182,7 +188,7 @@ mod app {
         exti.unpend(exti::Event::GPIO12);
     }
 
-    #[task(priority = 3, shared=[led, pwm_max, delay, led_status])]
+    #[task(priority = 2, shared=[led, pwm_max, delay, led_status])]
     fn fade_in(ctx: fade_in::Context) {
         let mut led = ctx.shared.led;
         let mut led_status = ctx.shared.led_status;
@@ -207,7 +213,7 @@ mod app {
         }
     }
 
-    #[task(priority = 3,  shared=[led, pwm_max, delay, led_status,fade_out_handle])]
+    #[task(priority = 2,  shared=[led, pwm_max, delay, led_status,fade_out_handle])]
     fn fade_out(ctx: fade_out::Context) {
         let mut led = ctx.shared.led;
         let mut led_status = ctx.shared.led_status;
