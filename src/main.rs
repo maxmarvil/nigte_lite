@@ -9,16 +9,18 @@ extern crate panic_semihosting;
 #[rtic::app(device = hal::stm32, peripherals = true, dispatchers = [CEC])]
 mod app {
     use stm32g0xx_hal as hal;
-    use cortex_m::asm;
+    //use cortex_m::asm;
     //use hal::hal::adc::Channel;
     use hal::{prelude::*, stm32, stm32::TIM14, exti,
               timer::{pwm, Channel3, delay::Delay},
               gpio::{ SignalEdge,gpiob::PB7},//,
 
               analog::adc::{ OversamplingRatio, Precision, SampleTime, Adc, }};
-    use rtt_target::{rprintln, rtt_init_print};
+    //use rtt_target::{rprintln, rtt_init_print};
     use stm32g0xx_hal::gpio::Analog;
     use systick_monotonic::{ fugit::Duration, Systick};
+    use hal::power::{LowPowerMode, PowerMode};
+    use cortex_m::peripheral::SCB;
 
 
     #[shared]
@@ -32,7 +34,6 @@ mod app {
         led_status: bool,
         fade_out_handle: Option<fade_out::SpawnHandle>,
         fade_order: bool,
-        action_lock: bool,
         adc: Adc,
         opto_pin: PB7<Analog>,//Channel<Adc>,
     }
@@ -40,6 +41,7 @@ mod app {
     #[local]
     struct Local {
         exti: stm32::EXTI,
+        scb: SCB,
     }
 
     #[monotonic(binds = SysTick, default = true)]
@@ -59,8 +61,12 @@ mod app {
         //let trigger = None;
         let mut pwm_ch2 = pwm.bind_pin(gpiob.pb0);
         let mut delay = ctx.device.TIM14.delay(&mut rcc);
-        rtt_init_print!();
+        //rtt_init_print!();
         let mut adc = ctx.device.ADC.constrain(&mut rcc);
+
+        let mut power = ctx.device.PWR.constrain(&mut rcc);
+        power.set_mode(PowerMode::UltraLowPower(LowPowerMode::StopMode2));
+        let  scb = ctx.core.SCB;
 
         adc.set_sample_time(SampleTime::T_80);
         adc.set_precision(Precision::B_12);
@@ -72,7 +78,7 @@ mod app {
 
 
         tim_ower.listen();
-        rprintln!("start");
+        //rprintln!("start");
         let mut exti = ctx.device.EXTI;
         pwm_ch2.enable();
         pwm_ch2.set_duty(0);
@@ -93,10 +99,10 @@ mod app {
                 fade_order: false,
                 adc,
                 opto_pin,
-                action_lock: false
             },
             Local {
                 exti,
+                scb
             },
             init::Monotonics(mono),
         )
@@ -104,7 +110,6 @@ mod app {
 
     #[task(binds = EXTI4_15, priority = 3, local = [exti], shared=[pir_status, fade_out_handle, fade_order, adc, opto_pin, led_status])]
     fn pir_signal(ctx: pir_signal::Context) {
-        //let mut trigger = ctx.shared.trigger;
         let mut pir_status = ctx.shared.pir_status;
         let mut led_status = ctx.shared.led_status;
         let mut fade_out_handle = ctx.shared.fade_out_handle;
@@ -122,45 +127,30 @@ mod app {
         pir_status.lock(|pir_status|{
             *pir_status = status;
         });
-        if status {
-            rprintln!("up");
-        }
-        if status_fall {
-            rprintln!("fail");
-        }
+        // if status {
+        //     rprintln!("up");
+        // }
+        // if status_fall {
+        //     rprintln!("fail");
+        // }
 
         let opto_data = (adc, opto_pin).lock(|adc, opto_pin| adc.read_voltage(opto_pin).unwrap_or(0));
 
-        rprintln!("status led-{} opto:{}", status_led, opto_data);
-        if status && opto_data<100 {
+        //rprintln!("status led-{} opto:{}", status_led, opto_data);
+        if status && opto_data<200 {
             fade_in::spawn().unwrap();
             if fade_order_status {
                 fade_out_handle.lock(|fade_out_h| {
                     let taked = fade_out_h.take();
-                    rprintln!("tacked {:?}", taked);
+                    //rprintln!("tacked {:?}", taked);
                     if let Some(handler_task) = taked{
                         //handler_task.cancel();
                         let resp = handler_task.cancel();
                         match resp {
-                            Ok(respon) => rprintln!("handler result {:?}", respon),
-                            Err(_) => rprintln!("cancel false"),
+                            Ok(_) => cortex_m::asm::nop(),//rprintln!("handler result {:?}", respon),
+                            Err(_) => cortex_m::asm::nop(),//rprintln!("cancel false"),
                         };
                     }
-                    // match taked {
-                    //     Some(handler_task) => {
-                    //         // if let Ok(resp_on) = handler.cancel() {
-                    //         //     rprintln!("handler result {:?}", resp_on);
-                    //         // }
-                    //
-                    //
-                    //         let resp = handler_task.cancel();
-                    //         match resp {
-                    //             Ok(respon) => rprintln!("handler result {:?}", respon),
-                    //             Err(_) => rprintln!("cancel false"),
-                    //         };
-                    //     },
-                    //     None => rprintln!("empty handler"),
-                    // }
                 });
             }
             fade_order.lock(|fade_order| { *fade_order = false; } );
@@ -175,7 +165,6 @@ mod app {
                 handler_new = None;
             }
 
-
             (fade_out_handle, fade_order).lock(|fade_out_handle, fade_order| {
                 *fade_out_handle = handler_new;
                 *fade_order = true;
@@ -185,22 +174,17 @@ mod app {
         exti.unpend(exti::Event::GPIO12);
     }
 
-    #[task(priority = 2, shared=[led, pwm_max, delay, led_status, action_lock])]
+    #[task(priority = 2, shared=[led, pwm_max, delay, led_status])]
     fn fade_in(ctx: fade_in::Context) {
         let mut led = ctx.shared.led;
         let mut led_status = ctx.shared.led_status;
         let mut delay = ctx.shared.delay;
         let mut pwm_max = ctx.shared.pwm_max;
         let max  = pwm_max.lock(|pwm_max| *pwm_max);
-        let status  = led_status.lock(|led_status| *led_status);
+        let status_led  = led_status.lock(|led_status| *led_status);
 
-        let mut action_lock = ctx.shared.action_lock;
-
-        if status == false {
-            rprintln!("led on");
-            action_lock.lock(|action_lock|{
-                *action_lock = true;
-            });
+        if status_led == false {
+            //rprintln!("led on");
             led_status.lock(|led_status|{
                 *led_status = true;
             });
@@ -213,29 +197,22 @@ mod app {
             ( led).lock(|led| {
                 led.set_duty(max);
             });
-            action_lock.lock(|action_lock|{
-                *action_lock = false;
-            });
-
         }
     }
 
-    #[task(priority = 2,  shared=[led, pwm_max, delay, led_status,fade_out_handle, action_lock])]
+    #[task(priority = 2, local=[scb], shared=[led, pwm_max, delay, led_status,fade_out_handle])]
     fn fade_out(ctx: fade_out::Context) {
         let mut led = ctx.shared.led;
         let mut led_status = ctx.shared.led_status;
         let mut delay = ctx.shared.delay;
         let mut pwm_max = ctx.shared.pwm_max;
-        let mut action_lock = ctx.shared.action_lock;
+        let scb = ctx.local.scb;
         let max  = pwm_max.lock(|pwm_max| *pwm_max);
-        let status  = led_status.lock(|led_status| *led_status);
+        let status_led  = led_status.lock(|led_status| *led_status);
         let mut fade_out_handle = ctx.shared.fade_out_handle;
 
-        if status {
-            rprintln!("led off");
-            action_lock.lock(|action_lock|{
-                *action_lock = true;
-            });
+        if status_led {
+            //rprintln!("led off");
             led_status.lock(|led_status|{
                 *led_status = false;
             });
@@ -252,18 +229,16 @@ mod app {
             (led).lock(|led| {
                 led.set_duty(0);
             });
-            action_lock.lock(|action_lock|{
-                *action_lock = false;
-            });
-
+            delay.lock(|delay| delay.delay(50.millis()));
+            scb.set_sleepdeep();
         }
     }
 
     #[idle]
     fn idle(_: idle::Context) -> ! {
         loop {
-            asm::nop();
-            //cortex_m::asm::wfi();
+            //cortex_m::asm::nop();
+            cortex_m::asm::wfi();
         }
     }
 }
