@@ -18,22 +18,20 @@ mod app {
               analog::adc::{ OversamplingRatio, Precision, SampleTime, Adc, }};
     //use rtt_target::{rprintln, rtt_init_print};
     use stm32g0xx_hal::gpio::Analog;
-    use systick_monotonic::{ fugit::Duration, Systick};
+    use systick_monotonic::{ fugit::Duration, Systick};//
     use hal::power::{LowPowerMode, PowerMode};
-    use cortex_m::peripheral::SCB;
+    use cortex_m::peripheral::{SCB};
 
 
     #[shared]
     struct Shared {
         pir_status: bool,
-        //trigger: Option<SignalEdge>,
-        //tim_ower: Timer<stm32::TIM17>,
         led: pwm::PwmPin<stm32::TIM3, Channel3>,//PA12<Output<PushPull>>,
         pwm_max: u32,
         delay: Delay<TIM14>,
         led_status: bool,
         fade_out_handle: Option<fade_out::SpawnHandle>,
-        fade_order: bool,
+        fade_timer: bool,
         adc: Adc,
         opto_pin: PB7<Analog>,//Channel<Adc>,
     }
@@ -41,7 +39,7 @@ mod app {
     #[local]
     struct Local {
         exti: stm32::EXTI,
-        scb: SCB,
+        scb: SCB
     }
 
     #[monotonic(binds = SysTick, default = true)]
@@ -50,8 +48,8 @@ mod app {
     #[init]
     fn init(ctx: init::Context) -> (Shared, Local, init::Monotonics) {
         let mut rcc = ctx.device.RCC.constrain();
-
-        let mono = Systick::new(ctx.core.SYST, 16_000_000);
+        let systick = ctx.core.SYST;
+        let mono = Systick::new(systick, 16_000_000);
 
         let gpioa = ctx.device.GPIOA.split(&mut rcc);
         let gpiob = ctx.device.GPIOB.split(&mut rcc);
@@ -96,7 +94,7 @@ mod app {
                 delay,
                 led_status: false,
                 fade_out_handle: None,
-                fade_order: false,
+                fade_timer: false,
                 adc,
                 opto_pin,
             },
@@ -108,24 +106,24 @@ mod app {
         )
     }
 
-    #[task(binds = EXTI4_15, priority = 3, local = [exti], shared=[pir_status, fade_out_handle, fade_order, adc, opto_pin, led_status])]
+    #[task(binds = EXTI4_15, priority = 3, local = [exti], shared=[pir_status, fade_out_handle, fade_timer, adc, opto_pin, led_status])]
     fn pir_signal(ctx: pir_signal::Context) {
         let mut pir_status = ctx.shared.pir_status;
-        let mut led_status = ctx.shared.led_status;
+        //let mut led_status = ctx.shared.led_status;
         let mut fade_out_handle = ctx.shared.fade_out_handle;
-        let mut fade_order = ctx.shared.fade_order;
+        let mut fade_timer = ctx.shared.fade_timer;
         let opto_pin = ctx.shared.opto_pin;
         let adc = ctx.shared.adc;
-        let fade_order_status = fade_order.lock(|fade_order| *fade_order);
-        let status_led  = led_status.lock(|led_status| *led_status);
+        let fade_timer_status = fade_timer.lock(|fade_timer| *fade_timer);
+        //let status_led  = led_status.lock(|led_status| *led_status);
         let exti = ctx.local.exti;
         use SignalEdge::*;
 
-        let status = exti.is_pending(exti::Event::GPIO12, Rising);
-        let status_fall = exti.is_pending(exti::Event::GPIO12, Falling);
+        let status_up = exti.is_pending(exti::Event::GPIO12, Rising);
+        //let status_fall = exti.is_pending(exti::Event::GPIO12, Falling);
 
         pir_status.lock(|pir_status|{
-            *pir_status = status;
+            *pir_status = status_up;
         });
         // if status {
         //     rprintln!("up");
@@ -137,37 +135,42 @@ mod app {
         let opto_data = (adc, opto_pin).lock(|adc, opto_pin| adc.read_voltage(opto_pin).unwrap_or(0));
 
         //rprintln!("status led-{} opto:{}", status_led, opto_data);
-        if status && opto_data<200 {
-            fade_in::spawn().unwrap();
-            if fade_order_status {
-                fade_out_handle.lock(|fade_out_h| {
-                    let taked = fade_out_h.take();
-                    //rprintln!("tacked {:?}", taked);
-                    if let Some(handler_task) = taked{
-                        //handler_task.cancel();
-                        let resp = handler_task.cancel();
-                        match resp {
-                            Ok(_) => cortex_m::asm::nop(),//rprintln!("handler result {:?}", respon),
-                            Err(_) => cortex_m::asm::nop(),//rprintln!("cancel false"),
-                        };
-                    }
-                });
+        if status_up  {
+            if opto_data<200 {
+                fade_in::spawn().unwrap();
+                if fade_timer_status {
+                    fade_out_handle.lock(|fade_out_h| {
+                        let taked = fade_out_h.take();
+                        //rprintln!("tacked {:?}", taked);
+                        if let Some(handler_task) = taked{
+                            //handler_task.cancel();
+                            let resp = handler_task.cancel();
+                            match resp {
+                                Ok(_) => cortex_m::asm::nop(),//rprintln!("handler result {:?}", respon),
+                                Err(_) => cortex_m::asm::nop(),//rprintln!("cancel false"),
+                            };
+                        }
+                    });
+                }
+                fade_timer.lock(|fade_timer| { *fade_timer = false; } );
             }
-            fade_order.lock(|fade_order| { *fade_order = false; } );
 
-        } else if status_fall && status_led {
+
+        } else { //if status_fall && status_led && fade_timer_status == false
 
             let handler_new;
-
-            if let Ok(handler) = fade_out::spawn_after(Duration::<u64, 1, 100>::from_ticks(500)) {//Duration::<u64, 1, 1000>::from_ticks(5000)
+            //fade_out::spawn().unwrap();
+            if let Ok(handler) = fade_out::spawn_after(Duration::<u64, 1, 100>::from_ticks(500)) {//
                 handler_new = Some(handler);
+                (fade_timer).lock(|fade_timer| {
+                    *fade_timer = true;
+                });
             } else {
                 handler_new = None;
             }
 
-            (fade_out_handle, fade_order).lock(|fade_out_handle, fade_order| {
+            (fade_out_handle).lock(|fade_out_handle| {
                 *fade_out_handle = handler_new;
-                *fade_order = true;
             });
         }
 
