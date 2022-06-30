@@ -31,7 +31,6 @@ mod app {
         pwm_max: u32,
         delay: Delay<TIM14>,
         led_status: bool,
-        fade_timer: bool,
         adc: Adc,
         opto_pin: PB7<Analog>,//Channel<Adc>,
         timer: Timer<stm32::TIM17>,
@@ -95,7 +94,6 @@ mod app {
                 pwm_max,
                 delay,
                 led_status: false,
-                fade_timer: false,
                 adc,
                 opto_pin,
                 timer
@@ -148,73 +146,58 @@ mod app {
             }
 
         } else  {
-            (timer).lock(|tim_ower| {
-                tim_ower.start(6000.millis());
+            (timer).lock(|timer| {
+                timer.start(6000.millis());
             });
         }
 
         exti.unpend(exti::Event::GPIO12);
     }
 
-    #[task(priority = 2, shared=[led, pwm_max, delay, led_status])]
+    #[task(priority = 2, shared=[led, pwm_max, delay])]
     fn fade_in(ctx: fade_in::Context) {
         let mut led = ctx.shared.led;
-        let mut led_status = ctx.shared.led_status;
         let mut delay = ctx.shared.delay;
         let mut pwm_max = ctx.shared.pwm_max;
         let max  = pwm_max.lock(|pwm_max| *pwm_max);
-        let status_led  = led_status.lock(|led_status| *led_status);
 
-        if status_led == false {
-            //rprintln!("led on");
-            led_status.lock(|led_status|{
-                *led_status = true;
-            });
-            for val in 0 .. 100 {
-                delay.lock(|delay| delay.delay(10.millis()));
-                ( led).lock(|led| {
-                    led.set_duty(max*val/100);
-                });
-            }
+        for val in 0 .. 100 {
+            delay.lock(|delay| delay.delay(10.millis()));
             ( led).lock(|led| {
-                led.set_duty(max);
+                led.set_duty(max*val/100);
             });
         }
+        ( led).lock(|led| {
+            led.set_duty(max);
+        });
     }
 
     #[task(priority = 2, local=[scb], shared=[led, pwm_max, delay, led_status, timer])]
     fn fade_out(ctx: fade_out::Context) {
         let mut led = ctx.shared.led;
-        let mut led_status = ctx.shared.led_status;
         let mut delay = ctx.shared.delay;
         let mut pwm_max = ctx.shared.pwm_max;
         let mut timer = ctx.shared.timer;
         let scb = ctx.local.scb;
         let max  = pwm_max.lock(|pwm_max| *pwm_max);
-        let status_led  = led_status.lock(|led_status| *led_status);
 
-        if status_led {
-            //rprintln!("led off");
-            led_status.lock(|led_status|{
-                *led_status = false;
-            });
-            for val in 0..100 {
-                delay.lock(|delay| delay.delay(5.millis()));
-                let re_pr = 100 - val;
-                (led).lock(|led| {
-                    led.set_duty(max * re_pr / 100);
-                });
-            }
-            (timer).lock(|timer| {
-                timer.clear_irq();
-            });
+        for val in 0..100 {
+            delay.lock(|delay| delay.delay(5.millis()));
+            let re_pr = 100 - val;
             (led).lock(|led| {
-                led.set_duty(0);
+                led.set_duty(max * re_pr / 100);
             });
-            delay.lock(|delay| delay.delay(50.millis()));
-            scb.set_sleepdeep();
-            scb.set_sleeponexit();
         }
+        (timer).lock(|timer| {
+            timer.clear_irq();
+        });
+        (led).lock(|led| {
+            led.set_duty(0);
+        });
+        delay.lock(|delay| delay.delay(50.millis()));
+        scb.set_sleepdeep();
+        scb.set_sleeponexit();
+
     }
 
     #[idle]
