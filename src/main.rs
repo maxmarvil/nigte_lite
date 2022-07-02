@@ -147,7 +147,7 @@ mod app {
 
         } else  {
             (timer).lock(|timer| {
-                timer.start(6000.millis());
+                timer.start(4000.millis());
             });
         }
 
@@ -194,9 +194,9 @@ mod app {
         (led).lock(|led| {
             led.set_duty(0);
         });
-        delay.lock(|delay| delay.delay(50.millis()));
+        delay.lock(|delay| delay.delay(10.millis()));
         scb.set_sleepdeep();
-        scb.set_sleeponexit();
+        //scb.set_sleeponexit();
 
     }
 
