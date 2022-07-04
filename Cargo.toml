@@ -16,6 +16,8 @@ stm32f0xx-hal = { version = "0.18.0", features = ["stm32f030x4", "stm32f030"] }
 rtt-target =  { version = "0.3.1", features = ["cortex-m"] }
 systick-monotonic = "1.0.0"
 fugit = "0.3.5"
+stm32f0 = "0.14"
+nb = "1"
 
 # Uncomment for the panic example.
 # panic-itm = "0.4.1"
