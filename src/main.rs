@@ -8,6 +8,7 @@ use stm32f0xx_hal as hal;
 use crate::hal::{pac, prelude::*, gpio::gpioa};
 use pac::{interrupt, Interrupt, Peripherals, EXTI};
 use cortex_m_rt::entry;
+use rtt_target::{rprintln, rtt_init_print};
 use cortex_m::{interrupt::Mutex, peripheral::Peripherals as c_m_Peripherals};
 use core::{cell::RefCell, ops::DerefMut};
 use stm32f0xx_hal::gpio::{Output, PushPull};
@@ -19,6 +20,7 @@ static INT: Mutex<RefCell<Option<EXTI>>> = Mutex::new(RefCell::new(None));
 fn main() -> ! {
 
     if let (Some(p), Some(cp)) = (Peripherals::take(), c_m_Peripherals::take()) {
+        rtt_init_print!();
         cortex_m::interrupt::free(move |cs| {
             let rcc = p.RCC;
             rcc.apb2enr.modify(|_, w| w.syscfgen().set_bit());
@@ -31,20 +33,20 @@ fn main() -> ! {
             let exti = p.EXTI;
             // (Re-)configure PA1 as output
             let mut led = cortex_m::interrupt::free(move |cs| gpioa.pa6.into_push_pull_output(cs));
-
+            rprintln!("start");
             // Set up a timer expiring after 1s
             //let timer = Timer::tim1(p.TIM1, Hertz(1), &mut rcc);
     // Turn off LED
             led.set_low().ok();
 
-            // Enable external interrupt for PB1
+            // Enable external interrupt for PA6
             syscfg.exticr2.modify(|_, w| unsafe { w.exti4().bits(1) });
 
             // Set interrupt request mask for line 1
-            exti.imr.modify(|_, w| w.mr1().set_bit());
+            exti.imr.modify(|_, w| w.mr4().set_bit());
 
             // Set interrupt rising trigger for line 1
-            exti.rtsr.modify(|_, w| w.tr1().set_bit());
+            exti.rtsr.modify(|_, w| w.tr4().set_bit());
 
             // Move control over LED and DELAY and EXTI into global mutexes
             *LED.borrow(cs).borrow_mut() = Some(led);
@@ -67,6 +69,7 @@ fn main() -> ! {
 #[interrupt]
 fn EXTI4_15() {
     // Enter critical section
+    rprintln!("EXTI");
     cortex_m::interrupt::free(|cs| {
         // Obtain all Mutex protected resources
         if let (&mut Some(ref mut led), &mut Some(ref mut exti)) = (
@@ -77,7 +80,7 @@ fn EXTI4_15() {
             led.toggle().ok();
 
             // Turn off LED
-
+            rprintln!("EXTI interrupt");
 
             // Clear event triggering the interrupt
             exti.pr.write(|w| w.pr4().set_bit());
