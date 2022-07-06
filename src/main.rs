@@ -11,35 +11,39 @@ mod app {
     use stm32g0xx_hal as hal;
     //use cortex_m::asm;
     //use hal::hal::adc::Channel;
-    use hal::{prelude::*, stm32, stm32::TIM14, exti,
-              timer::{pwm, Channel3, delay::Delay},
-              gpio::{ SignalEdge,gpiob::PB7},//,
+    use hal::{
+        analog::adc::{Adc, OversamplingRatio, Precision, SampleTime},
+        exti,
+        gpio::{gpiob::PB7, SignalEdge}, //,
 
-              analog::adc::{ OversamplingRatio, Precision, SampleTime, Adc, }};
+        prelude::*,
+        stm32,
+        stm32::TIM14,
+        timer::{delay::Delay, pwm, Channel3},
+    };
     //use rtt_target::{rprintln, rtt_init_print};
-    use stm32g0xx_hal::gpio::Analog;
-    use systick_monotonic::{ fugit::Duration, Systick};//
+    use cortex_m::peripheral::SCB;
     use hal::power::{LowPowerMode, PowerMode};
-    use cortex_m::peripheral::{SCB};
-
+    use stm32g0xx_hal::gpio::Analog;
+    use systick_monotonic::{fugit::Duration, Systick}; //
 
     #[shared]
     struct Shared {
         pir_status: bool,
-        led: pwm::PwmPin<stm32::TIM3, Channel3>,//PA12<Output<PushPull>>,
+        led: pwm::PwmPin<stm32::TIM3, Channel3>, //PA12<Output<PushPull>>,
         pwm_max: u32,
         delay: Delay<TIM14>,
         led_status: bool,
         fade_out_handle: Option<fade_out::SpawnHandle>,
         fade_timer: bool,
         adc: Adc,
-        opto_pin: PB7<Analog>,//Channel<Adc>,
+        opto_pin: PB7<Analog>, //Channel<Adc>,
     }
 
     #[local]
     struct Local {
         exti: stm32::EXTI,
-        scb: SCB
+        scb: SCB,
     }
 
     #[monotonic(binds = SysTick, default = true)]
@@ -53,9 +57,11 @@ mod app {
 
         let gpioa = ctx.device.GPIOA.split(&mut rcc);
         let gpiob = ctx.device.GPIOB.split(&mut rcc);
+
         let pir = gpioa.pa12.into_pull_down_input();
         let mut tim_ower = ctx.device.TIM17.timer(&mut rcc);
         let pwm = ctx.device.TIM3.pwm(1.kHz(), &mut rcc);
+
         //let trigger = None;
         let mut pwm_ch2 = pwm.bind_pin(gpiob.pb0);
         let mut delay = ctx.device.TIM14.delay(&mut rcc);
@@ -64,7 +70,7 @@ mod app {
 
         let mut power = ctx.device.PWR.constrain(&mut rcc);
         power.set_mode(PowerMode::UltraLowPower(LowPowerMode::StopMode2));
-        let  scb = ctx.core.SCB;
+        let scb = ctx.core.SCB;
 
         adc.set_sample_time(SampleTime::T_80);
         adc.set_precision(Precision::B_12);
@@ -73,7 +79,6 @@ mod app {
         adc.oversampling_enable(true);
         delay.delay(20.millis());
         adc.calibrate();
-
 
         tim_ower.listen();
         //rprintln!("start");
@@ -98,10 +103,7 @@ mod app {
                 adc,
                 opto_pin,
             },
-            Local {
-                exti,
-                scb
-            },
+            Local { exti, scb },
             init::Monotonics(mono),
         )
     }
@@ -122,7 +124,7 @@ mod app {
         let status_up = exti.is_pending(exti::Event::GPIO12, Rising);
         //let status_fall = exti.is_pending(exti::Event::GPIO12, Falling);
 
-        pir_status.lock(|pir_status|{
+        pir_status.lock(|pir_status| {
             *pir_status = status_up;
         });
         // if status {
@@ -132,35 +134,38 @@ mod app {
         //     rprintln!("fail");
         // }
 
-        let opto_data = (adc, opto_pin).lock(|adc, opto_pin| adc.read_voltage(opto_pin).unwrap_or(0));
+        let opto_data =
+            (adc, opto_pin).lock(|adc, opto_pin| adc.read_voltage(opto_pin).unwrap_or(0));
 
         //rprintln!("status led-{} opto:{}", status_led, opto_data);
-        if status_up  {
-            if opto_data<200 {
+        if status_up {
+            if opto_data < 200 {
                 fade_in::spawn().unwrap();
                 if fade_timer_status {
                     fade_out_handle.lock(|fade_out_h| {
                         let taked = fade_out_h.take();
                         //rprintln!("tacked {:?}", taked);
-                        if let Some(handler_task) = taked{
+                        if let Some(handler_task) = taked {
                             //handler_task.cancel();
                             let resp = handler_task.cancel();
                             match resp {
-                                Ok(_) => cortex_m::asm::nop(),//rprintln!("handler result {:?}", respon),
-                                Err(_) => cortex_m::asm::nop(),//rprintln!("cancel false"),
+                                Ok(_) => cortex_m::asm::nop(), //rprintln!("handler result {:?}", respon),
+                                Err(_) => cortex_m::asm::nop(), //rprintln!("cancel false"),
                             };
                         }
                     });
                 }
-                fade_timer.lock(|fade_timer| { *fade_timer = false; } );
+                fade_timer.lock(|fade_timer| {
+                    *fade_timer = false;
+                });
             }
-
-
-        } else { //if status_fall && status_led && fade_timer_status == false
+        } else {
+            //if status_fall && status_led && fade_timer_status == false
 
             let handler_new;
             //fade_out::spawn().unwrap();
-            if let Ok(handler) = fade_out::spawn_after(Duration::<u64, 1, 100>::from_ticks(500)) {//
+            if let Ok(handler) = fade_out::spawn_after(Duration::<u64, 1, 100>::from_ticks(500)) {
+                //
                 handler_new = Some(handler);
                 (fade_timer).lock(|fade_timer| {
                     *fade_timer = true;
@@ -183,21 +188,21 @@ mod app {
         let mut led_status = ctx.shared.led_status;
         let mut delay = ctx.shared.delay;
         let mut pwm_max = ctx.shared.pwm_max;
-        let max  = pwm_max.lock(|pwm_max| *pwm_max);
-        let status_led  = led_status.lock(|led_status| *led_status);
+        let max = pwm_max.lock(|pwm_max| *pwm_max);
+        let status_led = led_status.lock(|led_status| *led_status);
 
         if status_led == false {
             //rprintln!("led on");
-            led_status.lock(|led_status|{
+            led_status.lock(|led_status| {
                 *led_status = true;
             });
-            for val in 0 .. 100 {
+            for val in 0..100 {
                 delay.lock(|delay| delay.delay(10.millis()));
-                ( led).lock(|led| {
-                    led.set_duty(max*val/100);
+                (led).lock(|led| {
+                    led.set_duty(max * val / 100);
                 });
             }
-            ( led).lock(|led| {
+            (led).lock(|led| {
                 led.set_duty(max);
             });
         }
@@ -210,13 +215,13 @@ mod app {
         let mut delay = ctx.shared.delay;
         let mut pwm_max = ctx.shared.pwm_max;
         let scb = ctx.local.scb;
-        let max  = pwm_max.lock(|pwm_max| *pwm_max);
-        let status_led  = led_status.lock(|led_status| *led_status);
+        let max = pwm_max.lock(|pwm_max| *pwm_max);
+        let status_led = led_status.lock(|led_status| *led_status);
         let mut fade_out_handle = ctx.shared.fade_out_handle;
 
         if status_led {
             //rprintln!("led off");
-            led_status.lock(|led_status|{
+            led_status.lock(|led_status| {
                 *led_status = false;
             });
             for val in 0..100 {
@@ -226,7 +231,7 @@ mod app {
                     led.set_duty(max * re_pr / 100);
                 });
             }
-            fade_out_handle.lock(|handler|{
+            fade_out_handle.lock(|handler| {
                 *handler = None;
             });
             (led).lock(|led| {
