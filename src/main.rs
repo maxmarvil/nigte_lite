@@ -182,7 +182,7 @@ mod app {
         exti.unpend(exti::Event::GPIO12);
     }
 
-    #[task(priority = 2, shared=[led, pwm_max, delay, led_status])]
+    #[task(priority = 2, capacity=6, shared=[led, pwm_max, delay, led_status])]
     fn fade_in(ctx: fade_in::Context) {
         let mut led = ctx.shared.led;
         let mut led_status = ctx.shared.led_status;
@@ -208,13 +208,13 @@ mod app {
         }
     }
 
-    #[task(priority = 2, local=[scb], shared=[led, pwm_max, delay, led_status,fade_out_handle])]
+    #[task(priority = 2, capacity=6, local=[scb], shared=[led, pwm_max, delay, led_status,fade_out_handle])]
     fn fade_out(ctx: fade_out::Context) {
         let mut led = ctx.shared.led;
         let mut led_status = ctx.shared.led_status;
         let mut delay = ctx.shared.delay;
         let mut pwm_max = ctx.shared.pwm_max;
-        let scb = ctx.local.scb;
+        //let scb = ctx.local.scb;
         let max = pwm_max.lock(|pwm_max| *pwm_max);
         let status_led = led_status.lock(|led_status| *led_status);
         let mut fade_out_handle = ctx.shared.fade_out_handle;
@@ -237,16 +237,16 @@ mod app {
             (led).lock(|led| {
                 led.set_duty(0);
             });
-            delay.lock(|delay| delay.delay(50.millis()));
-            scb.set_sleepdeep();
+            //delay.lock(|delay| delay.delay(50.millis()));
+            //scb.set_sleepdeep();
         }
     }
 
     #[idle]
     fn idle(_: idle::Context) -> ! {
         loop {
-            //cortex_m::asm::nop();
-            cortex_m::asm::wfi();
+            cortex_m::asm::nop();
+            //cortex_m::asm::wfi();
         }
     }
 }
