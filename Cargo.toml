@@ -7,11 +7,11 @@ version = "0.1.0"
 
 [dependencies]
 cortex-m = "0.7.0"
-cortex-m-rt = "0.6.8"
+cortex-m-rt = "0.6.15"
 cortex-m-semihosting = "0.3.3"
 stm32l0 = "0.13.0"
 panic-probe = { version = "0.3.0", features = ["print-rtt"] }
-stm32l0xx-hal = { version="0.9.0",features = ["stm32l0x1","flash-32","ram-8","tssop20","io-STM32L031","eeprom-1024"] }# For the stm32g031k8 mc  ,version = "0.1.5"
+stm32l0xx-hal = { version="0.9.0",features = ['rt',"stm32l0x1","flash-32","ram-8","tssop20","io-STM32L031","eeprom-1024"] }# For the stm32g031k8 mc  ,version = "0.1.5"
 rtt-target =  { version = "0.3.1", features = ["cortex-m"] }
 
 
