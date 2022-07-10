@@ -33,30 +33,30 @@ fn main() -> ! {
     let cp = cortex_m::Peripherals::take().expect("cannot take core peripherals");
     let dp = stm32::Peripherals::take().expect("cannot take peripherals");
     let mut rcc = dp.RCC.freeze(Config::hsi(Prescaler::NotDivided)); //Config::new(SysClockSrc::PLL)
-    let mut adc = dp.ADC.constrain(&mut rcc);
+                                                                     //let mut adc = dp.ADC.constrain(&mut rcc);
     let mut delay = dp.TIM14.delay(&mut rcc);
 
-    adc.set_sample_time(SampleTime::T_80);
-    adc.set_precision(Precision::B_12);
-    adc.set_oversampling_ratio(OversamplingRatio::X_16);
-    adc.set_oversampling_shift(16);
-    adc.oversampling_enable(true);
+    // adc.set_sample_time(SampleTime::T_80);
+    // adc.set_precision(Precision::B_12);
+    // adc.set_oversampling_ratio(OversamplingRatio::X_16);
+    // adc.set_oversampling_shift(16);
+    // adc.oversampling_enable(true);
 
     delay.delay(20.micros()); // Wait for ADC voltage regulator to stabilize
-    adc.calibrate();
+                              //adc.calibrate();
 
     let timeout = 5000;
     //let mut timer = dp.TIM16.timer(&mut rcc);
     let gpioa = dp.GPIOA.split(&mut rcc);
     let gpiob = dp.GPIOB.split(&mut rcc);
-    let pwm_pin = gpiob.pb0.into_push_pull_output();
+    let mut pwm_pin = gpiob.pb0.into_push_pull_output();
     //pwm_pin.enable();
     let mut exti = dp.EXTI;
     let syscfg = dp.SYSCFG;
 
     //let mut pwm_pin = pwm.bind_pin(gpiob.pb0);
-
-    let pir = gpioa.pa12.into_pull_down_input();
+    pwm_pin.set_low();
+    let mut pir = gpioa.pa12.into_pull_down_input();
     // let pwm = dp.TIM3.pwm(1.kHz(), &mut rcc);
 
     // let mut opto_pin = gpiob.pb7.into_analog(); // opto-transistor temt6000
@@ -64,7 +64,12 @@ fn main() -> ! {
     // let mut timer_need_start = false;
     // let mut timer_started = false;
     // let mut led_on_status = false;
-    pir.listen(SignalEdge::Rising, &mut exti);
+    //pir.listen(SignalEdge::Rising, &mut exti);
+    exti.exticr4.modify(|r, w| unsafe { w.exti8_15().bits(1) });
+    exti.imr1.modify(|_, w| w.im12().set_bit());
+    exti.rtsr1.modify(|_, w| w.tr12().set_bit());
+    exti.ftsr1.modify(|_, w| w.tr12().set_bit());
+
     cortex_m::interrupt::free(move |cs| {
         //syscfg.cfgr2exticr2.modify(|_, w| unsafe { w.exti4().bits(1) });
 
