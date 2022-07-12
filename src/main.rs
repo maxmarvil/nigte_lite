@@ -9,20 +9,23 @@ use cortex_m::{asm, interrupt::Mutex, peripheral::NVIC};
 use cortex_m_rt::entry;
 use rtt_target::{rprintln, rtt_init_print};
 use stm32l0::stm32l0x1::interrupt;
+use stm32l0xx_hal::exti::TriggerEdge::Rising;
 use stm32l0xx_hal::{
+    exti,
     exti::{Exti, ExtiLine, GpioLine, TriggerEdge},
     gpio::{
         gpioa::{PA3, PA9},
         Input, Output, PullDown, PushPull,
     },
-    pac::{Interrupt, Peripherals},
+    pac::{Interrupt, Peripherals, EXTI},
     prelude::*,
     rcc::Config,
     syscfg::SYSCFG,
 };
 
 static LED: Mutex<RefCell<Option<PA3<Output<PushPull>>>>> = Mutex::new(RefCell::new(None));
-static PIR: Mutex<RefCell<Option<PA9<Input<PullDown>>>>> = Mutex::new(RefCell::new(None));
+static INTER: Mutex<RefCell<Option<Exti>>> = Mutex::new(RefCell::new(None));
+static LINE_PIR: Mutex<RefCell<Option<GpioLine>>> = Mutex::new(RefCell::new(None));
 
 #[entry]
 fn main() -> ! {
@@ -34,7 +37,7 @@ fn main() -> ! {
     let gpioa = dp.GPIOA.split(&mut rcc);
     let mut pwm_pin = gpioa.pa3.into_push_pull_output();
     let mut signal = gpioa.pa5.into_push_pull_output();
-    signal.set_high();
+    //signal.set_high();
     let mut syscfg = SYSCFG::new(dp.SYSCFG, &mut rcc);
     let mut exti = Exti::new(dp.EXTI);
 
@@ -45,7 +48,8 @@ fn main() -> ! {
 
     cortex_m::interrupt::free(move |cs| {
         *LED.borrow(cs).borrow_mut() = Some(pwm_pin);
-        *PIR.borrow(cs).borrow_mut() = Some(pir);
+        *INTER.borrow(cs).borrow_mut() = Some(exti);
+        *LINE_PIR.borrow(cs).borrow_mut() = Some(line);
     });
 
     unsafe {
@@ -64,17 +68,21 @@ fn EXTI4_15() {
     cortex_m::interrupt::free(|cs| {
         Exti::unpend(GpioLine::from_raw_line(9).unwrap());
 
-        if let (&mut Some(ref mut led), &mut Some(ref mut pir)) = (
+        if let (&mut Some(ref mut led), &mut Some(ref mut exti), &mut Some(ref mut line)) = (
             LED.borrow(cs).borrow_mut().deref_mut(),
-            PIR.borrow(cs).borrow_mut().deref_mut(),
+            INTER.borrow(cs).borrow_mut().deref_mut(),
         ) {
-            if pir.is_low().is_ok() {
-                rprintln!("EXTI low");
-                led.set_low().unwrap();
-            } else {
-                rprintln!("EXTI high");
-                led.set_high().unwrap();
-            }
+            let bm = 1 << line.raw_line();
+            // exti.raw.rtsr.modify(|r, w| r.bits(r.bits() | bm));
+            rprintln!("EXTI {:?}", exti_line.is);
+            //let status_up = exti.is_pending(EXTI::Event::GPIO9, Rising);
+            //if status_up {
+            rprintln!("EXTI high");
+            led.set_high().unwrap();
+            // } else {
+            //     rprintln!("EXTI low");
+            //     led.set_low().unwrap();
+            // }
         }
     });
 }
