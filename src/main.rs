@@ -49,7 +49,6 @@ fn main() -> ! {
     cortex_m::interrupt::free(move |cs| {
         *LED.borrow(cs).borrow_mut() = Some(pwm_pin);
         *INTER.borrow(cs).borrow_mut() = Some(exti);
-        *LINE_PIR.borrow(cs).borrow_mut() = Some(line);
     });
 
     unsafe {
@@ -66,15 +65,15 @@ fn EXTI4_15() {
     rprintln!("EXTI interrupt");
 
     cortex_m::interrupt::free(|cs| {
-        Exti::unpend(GpioLine::from_raw_line(9).unwrap());
-
-        if let (&mut Some(ref mut led), &mut Some(ref mut exti), &mut Some(ref mut line)) = (
+        if let (&mut Some(ref mut led), &mut Some(ref mut exti)) = (
             LED.borrow(cs).borrow_mut().deref_mut(),
             INTER.borrow(cs).borrow_mut().deref_mut(),
         ) {
-            let bm = 1 << line.raw_line();
-            // exti.raw.rtsr.modify(|r, w| r.bits(r.bits() | bm));
-            rprintln!("EXTI {:?}", exti_line.is);
+            //let bm = 1 << line.raw_line();
+            rprintln!(
+                "EXTI {:?}",
+                Exti::is_pending(GpioLine::from_raw_line(9).unwrap())
+            );
             //let status_up = exti.is_pending(EXTI::Event::GPIO9, Rising);
             //if status_up {
             rprintln!("EXTI high");
@@ -83,6 +82,7 @@ fn EXTI4_15() {
             //     rprintln!("EXTI low");
             //     led.set_low().unwrap();
             // }
+            Exti::unpend(GpioLine::from_raw_line(9).unwrap());
         }
     });
 }
