@@ -40,39 +40,41 @@ fn main() -> ! {
 
     let mut pir = gpioa.pa9.into_pull_down_input();
 
-    // let line = GpioLine::from_raw_line(pir.pin_number()).unwrap();
-    // exti.listen_gpio(&mut syscfg, pir.port(), line, TriggerEdge::Both);
-    //
-    // cortex_m::interrupt::free(move |cs| {
-    //     *LED.borrow(cs).borrow_mut() = Some(pwm_pin);
-    //     *PIR.borrow(cs).borrow_mut() = Some(pir);
-    // });
-    //
-    // unsafe {
-    //     NVIC::unmask(Interrupt::EXTI4_15);
-    // }
+    let line = GpioLine::from_raw_line(pir.pin_number()).unwrap();
+    exti.listen_gpio(&mut syscfg, pir.port(), line, TriggerEdge::Rising);
+
+    cortex_m::interrupt::free(move |cs| {
+        *LED.borrow(cs).borrow_mut() = Some(pwm_pin);
+        *PIR.borrow(cs).borrow_mut() = Some(pir);
+    });
+
+    unsafe {
+        NVIC::unmask(Interrupt::EXTI4_15);
+    }
 
     loop {
         asm::nop();
     }
 }
-//
-// #[interrupt]
-// fn EXTI4_15() {
-//     rprintln!("EXTI interrupt");
-//
-//     cortex_m::interrupt::free(|cs| {
-//         Exti::unpend(GpioLine::from_raw_line(9).unwrap());
-//
-//         if let (&mut Some(ref mut led), &mut Some(ref mut pir)) = (
-//             LED.borrow(cs).borrow_mut().deref_mut(),
-//             PIR.borrow(cs).borrow_mut().deref_mut(),
-//         ) {
-//             if pir.is_low().is_ok() {
-//                 led.set_low().unwrap();
-//             } else {
-//                 led.set_high().unwrap();
-//             }
-//         }
-//     });
-// }
+
+#[interrupt]
+fn EXTI4_15() {
+    rprintln!("EXTI interrupt");
+
+    cortex_m::interrupt::free(|cs| {
+        Exti::unpend(GpioLine::from_raw_line(9).unwrap());
+
+        if let (&mut Some(ref mut led), &mut Some(ref mut pir)) = (
+            LED.borrow(cs).borrow_mut().deref_mut(),
+            PIR.borrow(cs).borrow_mut().deref_mut(),
+        ) {
+            if pir.is_low().is_ok() {
+                rprintln!("EXTI low");
+                led.set_low().unwrap();
+            } else {
+                rprintln!("EXTI high");
+                led.set_high().unwrap();
+            }
+        }
+    });
+}
