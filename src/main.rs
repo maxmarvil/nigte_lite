@@ -39,9 +39,7 @@ static ADC: Mutex<RefCell<Option<Adc<Ready>>>> = Mutex::new(RefCell::new(None));
 static OPTOPIN: Mutex<RefCell<Option<PA1<Analog>>>> = Mutex::new(RefCell::new(None));
 static SHIFT: Mutex<RefCell<Option<u16>>> = Mutex::new(RefCell::new(None));
 static LED_STATUS: Mutex<RefCell<Option<bool>>> = Mutex::new(RefCell::new(Some(false)));
-static RCC: Mutex<RefCell<Option<Rcc>>> = Mutex::new(RefCell::new(None));
-static SCB: Mutex<RefCell<Option<SCB>>> = Mutex::new(RefCell::new(None));
-static EXTI_OB: Mutex<RefCell<Option<Exti>>> = Mutex::new(RefCell::new(None));
+
 static TIMEOUT: u8 = 4;
 
 #[entry]
@@ -54,6 +52,7 @@ fn main() -> ! {
     let gpioa = dp.GPIOA.split(&mut rcc);
     let mut pwr = PWR::new(dp.PWR, &mut rcc);
     let mut scb = cp.SCB;
+    let mut light_status = false;
 
     let mut syscfg = SYSCFG::new(dp.SYSCFG, &mut rcc);
     let mut exti = Exti::new(dp.EXTI);
@@ -78,15 +77,12 @@ fn main() -> ! {
     exti.listen_gpio(&mut syscfg, pir2.port(), line2, Falling);
 
     cortex_m::interrupt::free(move |cs| {
-        *LED.borrow(cs).borrow_mut() = Some(pwm_pin);
+        //*LED.borrow(cs).borrow_mut() = Some(pwm_pin);
         *TIMER.borrow(cs).borrow_mut() = Some(timer);
         *COUNT_D.borrow(cs).borrow_mut() = Some(0);
         *ADC.borrow(cs).borrow_mut() = Some(adc);
         *OPTOPIN.borrow(cs).borrow_mut() = Some(opto_pin);
         *SHIFT.borrow(cs).borrow_mut() = Some(correcting);
-        //*RCC.borrow(cs).borrow_mut() = Some(rcc);
-        //*SCB.borrow(cs).borrow_mut() = Some(scb);
-        //*EXTI_OB.borrow(cs).borrow_mut() = Some(exti);
     });
 
     unsafe {
@@ -98,6 +94,33 @@ fn main() -> ! {
     }
     //exti.wait_for_irq(exti_line, pwr.low_power_sleep_mode(&mut scb, &mut rcc));
     loop {
+        cortex_m::interrupt::free(|cs| {
+            if let &mut Some(ref mut led_status) = LED_STATUS.borrow(cs).borrow_mut().deref_mut() {
+                if *led_status && light_status == false {
+                    light_status = true;
+                    let max_value = pwm_pin.get_max_duty();
+                    for pr in 0..100 {
+                        delay();
+                        let duty = ((max_value as f32) * (pr as f32) / 100.0);
+                        pwm_pin.set_duty(duty as u16);
+                        //rprintln!("on {}", (pr as f32)); //((max_value as f32) * (pr as f32) / 100.0)
+                    }
+
+                    pwm_pin.set_duty(max_value);
+                } else if *led_status == false && light_status == true {
+                    light_status = false;
+                    let max_value = pwm_pin.get_max_duty();
+                    for pr in 0..100 {
+                        let re_pr = 100 - pr;
+                        //rprintln!("off {}", ((max_value as f32) * ((re_pr as f32) / 100.0)));
+                        delay();
+                        let duty = ((max_value as f32) * (re_pr as f32) / 100.0);
+                        pwm_pin.set_duty(duty as u16);
+                    }
+                    pwm_pin.set_duty(0);
+                }
+            }
+        });
         asm::wfi();
     }
 }
@@ -106,14 +129,14 @@ fn main() -> ! {
 fn EXTI4_15() {
     cortex_m::interrupt::free(|cs| {
         if let (
-            &mut Some(ref mut led),
+            //&mut Some(ref mut led),
             &mut Some(ref mut timer),
             &mut Some(ref mut adc),
             &mut Some(ref mut opto_pin),
             &mut Some(ref mut correcting),
             &mut Some(ref mut led_status),
         ) = (
-            LED.borrow(cs).borrow_mut().deref_mut(),
+            //LED.borrow(cs).borrow_mut().deref_mut(),
             TIMER.borrow(cs).borrow_mut().deref_mut(),
             ADC.borrow(cs).borrow_mut().deref_mut(),
             OPTOPIN.borrow(cs).borrow_mut().deref_mut(),
@@ -127,29 +150,20 @@ fn EXTI4_15() {
             let mut index: f32 = (*correcting as f32) / 4095.0;
             let mut val_new = (val as f32) * index;
             rprintln!("opto {} ", (val_new as u32));
-            if event_risen && val_new < 100.0 && *led_status == false {
+            if event_risen && *led_status == false {
                 // && val < 200
                 rprintln!("EXTI high");
-
+                if val_new < 100.0 {
+                    *led_status = true;
+                }
+            } else if event_risen && *led_status {
+                rprintln!("EXTI high refrash");
                 timer.unlisten();
                 *COUNT_D.borrow(cs).borrow_mut() = Some(0);
-                *led_status = true;
-
-                //led.set_high().unwrap();
-                let max_value = led.get_max_duty();
-                for pr in 0..100 {
-                    delay();
-                    let duty = ((max_value as f32) * (pr as f32) / 100.0);
-                    led.set_duty(duty as u16);
-                    //rprintln!("on {}", (pr as f32)); //((max_value as f32) * (pr as f32) / 100.0)
-                }
-
-                led.set_duty(max_value);
             }
             if event_falling && *led_status == true {
                 rprintln!("EXTI low");
                 timer.reset();
-                //timer.start(1.Hz());
                 timer.listen();
             }
             Exti::unpend(GpioLine::from_raw_line(9).unwrap());
@@ -162,20 +176,10 @@ fn EXTI4_15() {
 #[interrupt]
 fn TIM22() {
     cortex_m::interrupt::free(|cs| {
-        if let (
-            Some(ref mut timer),
-            Some(ref mut count),
-            Some(ref mut led_status),
-            // Some(ref mut rcc),
-            // Some(ref mut scb),
-            // Some(ref mut exti),
-        ) = (
+        if let (Some(ref mut timer), Some(ref mut count), Some(ref mut led_status)) = (
             TIMER.borrow(cs).borrow_mut().deref_mut(),
             COUNT_D.borrow(cs).borrow_mut().deref_mut(),
             LED_STATUS.borrow(cs).borrow_mut().deref_mut(),
-            // RCC.borrow(cs).borrow_mut().deref_mut(),
-            // SCB.borrow(cs).borrow_mut().deref_mut(),
-            // EXTI_OB.borrow(cs).borrow_mut().deref_mut(),
         ) {
             // Clear the interrupt flag.
             timer.clear_irq();
@@ -186,32 +190,12 @@ fn TIM22() {
                 timer.unlisten();
                 *count = 0;
                 *led_status = false;
-
-                //*COUNT_D.borrow(cs).borrow_mut() = Some(0);
-                // Change the LED state on each interrupt.
-                if let Some(ref mut led) = LED.borrow(cs).borrow_mut().deref_mut() {
-                    let max_value = led.get_max_duty();
-                    for pr in 0..100 {
-                        let re_pr = 100 - pr;
-                        //rprintln!("off {}", ((max_value as f32) * ((re_pr as f32) / 100.0)));
-                        delay();
-                        let duty = ((max_value as f32) * (re_pr as f32) / 100.0);
-                        led.set_duty(duty as u16);
-                    }
-                    led.set_duty(0);
-                    delay();
-                    //exti.wait_for_irq(exti_line, pwr.low_power_sleep_mode(scb, rcc));
-                }
             }
         }
-        //LED_STATUS.borrow(cs).replace(Some(led_status));
     });
 }
 
 fn delay() {
-    // We can't use `Delay`, as that requires a frequency of at least one MHz.
-    // Given our clock selection, the following loop should give us a nice delay
-    // when compiled in release mode.
     for _ in 0..10000 {
         asm::nop()
     }
