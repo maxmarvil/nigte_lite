@@ -1,0 +1,14 @@
+### Module positions - created on 2022-07-19 09:50
+### Printed by pcb_positions plugin
+## Unit = mm, Angle = deg.
+## Pcb Height 32.358mm, Pcb Width 42.010mm [based on Edge bounding box]
+## Side : top
+## Board Aux Origin: 0.000mm ,0.000mm
+# Ref         Val                 Package                       PosX       PosY       Pin1_PosX  Pin1_PosY    Rot     Side      Type
+J3            Conn_Prog           PinSocket_1x04_P2.54mm_Vert.. 99.8320    -73.6350   99.8320    -73.6350     90.0    top       THD
+RV1           5kOm                Potentiometer_Piher_PT-6-V_.. 96.0120    -94.9960   96.0120    -94.9960     90.0    top       THD
+J5            Conn_Led            PinHeader_1x02_P2.54mm_Vert.. 120.3960   -96.2610   120.3960   -96.2610      0.0    top       THD
+J2            Conn_Pir            PinSocket_1x03_P2.54mm_Vert.. 95.9970    -99.5930   95.9970    -99.5930    -90.0    top       THD
+J4            Conn_Opto           PinSocket_1x03_P2.54mm_Vert.. 85.3690    -89.4230   85.3690    -89.4230      0.0    top       THD
+BT1           Battery_Cell        JST_XH_B2B-XH-A_1x02_P2.50m.. 120.1220   -83.3290   120.1220   -83.3290    180.0    top       THD
+## End
