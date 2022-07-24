@@ -119,12 +119,20 @@
         "use_height_for_length_calcs": true
       },
       "track_widths": [
-        0.0
+        0.0,
+        0.2,
+        0.3,
+        0.5,
+        1.0
       ],
       "via_dimensions": [
         {
           "diameter": 0.0,
           "drill": 0.0
+        },
+        {
+          "diameter": 1.6,
+          "drill": 0.8
         }
       ],
       "zones_allow_external_fillets": false,
@@ -370,7 +378,7 @@
       },
       {
         "bus_width": 12.0,
-        "clearance": 0.5,
+        "clearance": 0.3,
         "diff_pair_gap": 0.25,
         "diff_pair_via_gap": 0.25,
         "diff_pair_width": 0.2,
@@ -378,12 +386,10 @@
         "microvia_diameter": 0.3,
         "microvia_drill": 0.1,
         "name": "Power",
-        "nets": [
-          "Net-(T1-Pad2)"
-        ],
+        "nets": [],
         "pcb_color": "rgba(0, 0, 0, 0.000)",
         "schematic_color": "rgba(0, 0, 0, 0.000)",
-        "track_width": 0.4,
+        "track_width": 0.5,
         "via_diameter": 0.8,
         "via_drill": 0.4,
         "wire_width": 6.0

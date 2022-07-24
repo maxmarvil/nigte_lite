@@ -1,0 +1,35 @@
+EESchema-LIBRARY Version 2.3
+#encoding utf-8
+#(c) SnapEDA 2016 (snapeda.com)
+#This work is licensed under a Creative Commons Attribution-ShareAlike 4.0 International License (CC BY-SA) with Design Exception 1.0
+#
+# CN5711
+#
+DEF CN5711 U 0 40 N Y 1 L N
+F0 "U" -200 100 50 H V L BNN
+F1 "CN5711" 0 0 50 H I L BNN
+F2 "SOIC-8-G" 0 0 50 H I L BNN
+F3 "" 0 0 50 H I L BNN
+DRAW
+T 900 -120 620 70 0 0 0 VCC Normal 0 L B
+T 900 80 620 70 0 0 0 VCC Normal 0 L B
+T 0 430 320 70 0 0 0 LED Normal 0 L B
+T 0 430 120 70 0 0 0 LED Normal 0 L B
+T 0 420 -290 70 0 0 0 NC Normal 0 L B
+T 0 40 -700 70 0 0 0 GND Normal 0 L B
+T 0 -420 -110 70 0 0 0 ISET Normal 0 R T
+T 0 -420 490 70 0 0 0 CE Normal 0 R T
+T 0 -200 0 70 0 0 0 CN5711 Normal 0 L B
+S -400 -600 400 600 0 0 10 f
+X 3 3 -100 900 300 D 40 40 0 0 B 
+X 4 4 100 900 300 D 40 40 0 0 B 
+X 5 5 700 300 300 L 40 40 0 0 B 
+X 6 6 700 100 300 L 40 40 0 0 B 
+X 7 7 700 -300 300 L 40 40 0 0 B 
+X 2 2 0 -900 300 U 40 40 0 0 B 
+X 1 1 -700 -200 300 R 40 40 0 0 B 
+X 8 8 -700 400 300 R 40 40 0 0 B 
+ENDDRAW
+ENDDEF
+#
+# End Library
