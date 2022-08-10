@@ -4,6 +4,7 @@
 Cargo.lock
 target/
 .idea/
+kicad/munlite-backups
 
 # editor files
 .vscode/*
