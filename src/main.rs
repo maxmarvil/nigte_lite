@@ -12,19 +12,19 @@ use stm32l0xx_hal::{
     adc::{Adc, Ready},
     exti::{Exti, ExtiLine, GpioLine, TriggerEdge},
     gpio::{
-        gpioa::{PA0, PA1, PA3},
+        gpioa::{PA0, PA1, PA2, PA3}, // ,PA5
         Analog,
     },
     pac::{self, Interrupt},
     prelude::*,
-    pwm::{self, Assigned, Pwm, C4},
+    pwm::{self, Assigned, Pwm, C3},
     pwr::{self, PWR},
     rcc::Config,
     syscfg::SYSCFG,
     timer::Timer,
 };
 
-static LED: Mutex<RefCell<Option<Pwm<TIM2, C4, Assigned<PA3<Analog>>>>>> =
+static LED: Mutex<RefCell<Option<Pwm<TIM2, C3, Assigned<PA2<Analog>>>>>> =
     Mutex::new(RefCell::new(None));
 static LED_STATUS: Mutex<RefCell<Option<bool>>> = Mutex::new(RefCell::new(Some(false)));
 static COUNT_D: Mutex<RefCell<Option<u8>>> = Mutex::new(RefCell::new(None));
@@ -43,6 +43,8 @@ fn main() -> ! {
 
     let mut rcc = dp.RCC.freeze(Config::hsi16());
     let gpioa = dp.GPIOA.split(&mut rcc);
+    let mut led_red = gpioa.pa5.into_push_pull_output();
+    led_red.set_high();
     let mut exti = Exti::new(dp.EXTI);
     let mut pwr = PWR::new(dp.PWR, &mut rcc);
     let mut delay = cp.SYST.delay(rcc.clocks);
@@ -56,11 +58,12 @@ fn main() -> ! {
     // Those are the user button and blue LED on the B-L072Z-LRWAN1 Discovery
     // board.
     let trigger_up = gpioa.pa9.into_floating_input();
-    let mut led_red = gpioa.pa5.into_push_pull_output();
+
     let pir2 = gpioa.pa10.into_pull_down_input();
     let pwm = pwm::Timer::new(dp.TIM2, 1_000.Hz(), &mut rcc);
-    let mut led: Pwm<TIM2, C4, Assigned<PA3<Analog>>> = pwm.channel4.assign(gpioa.pa3);
+    let mut led: Pwm<TIM2, C3, Assigned<PA2<Analog>>> = pwm.channel3.assign(gpioa.pa2);
     led.enable();
+    //led.set_duty(0);
 
     let mut syscfg = SYSCFG::new(dp.SYSCFG, &mut rcc);
 
@@ -83,9 +86,9 @@ fn main() -> ! {
     loop {
         if light_status == false {
             delay.delay_ms(100u32);
-            led_red.set_high().unwrap();
+            //led_red.set_high().unwrap();
             delay.delay_ms(100u32);
-            led_red.set_low().unwrap();
+            //led_red.set_low().unwrap();
 
             exti.wait_for_irq(
                 line,
