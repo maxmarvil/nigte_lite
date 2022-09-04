@@ -7,6 +7,7 @@ extern crate panic_probe;
 use core::{cell::RefCell, ops::DerefMut};
 use cortex_m::{interrupt::Mutex, peripheral::NVIC};
 use cortex_m_rt::entry;
+use rtt_target::{rprintln, rtt_init_print};
 use stm32l0::stm32l0x1::{interrupt, TIM2};
 use stm32l0xx_hal::{
     adc::{Adc, Ready},
@@ -40,7 +41,8 @@ static TIMEOUT: u8 = 4;
 fn main() -> ! {
     let cp = pac::CorePeripherals::take().unwrap();
     let dp = pac::Peripherals::take().unwrap();
-
+    rtt_init_print!();
+    rprintln!("start");
     let mut rcc = dp.RCC.freeze(Config::hsi16());
     let gpioa = dp.GPIOA.split(&mut rcc);
     let mut led_red = gpioa.pa5.into_push_pull_output();
@@ -55,6 +57,7 @@ fn main() -> ! {
     let mut scb = cp.SCB;
     let mut light_status = false;
 
+    rprintln!("pre-init");
     // Those are the user button and blue LED on the B-L072Z-LRWAN1 Discovery
     // board.
     let trigger_up = gpioa.pa9.into_floating_input();
