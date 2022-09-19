@@ -1,0 +1,26 @@
+### Module positions - created on 2022-07-19 09:50
+### Printed by pcb_positions plugin
+## Unit = mm, Angle = deg.
+## Pcb Height 32.358mm, Pcb Width 42.010mm [based on Edge bounding box]
+## Side : top
+## Board Aux Origin: 0.000mm ,0.000mm
+# Ref         Val                 Package                       PosX       PosY       Pin1_PosX  Pin1_PosY    Rot     Side      Type
+R3            100                 R_1206_3216Metric             121.9200   -90.4240   121.9200   -88.9615    -90.0    top       SMD
+REF**         R_1206_3216Metric   R_1206_3216Metric             99.6295    -87.8840   98.1670    -87.8840      0.0    top       SMD
+U2            AP2112K-3.3         SOT-23-5                      117.3480   -75.1840   118.4855   -76.1340    180.0    top       SMD
+C2            1uF                 C_1206_3216Metric             120.9040   -75.0570   120.9040   -73.5820    -90.0    top       SMD
+R2            10k                 R_0805_2012Metric             113.7920   -88.9000   112.8795   -88.9000      0.0    top       SMD
+R1            10k                 R_0805_2012Metric             90.9320    -76.7080   90.9320    -77.6205     90.0    top       SMD
+T1            IRLR2905TRPBF       TO-252-2                      109.7280   -96.0120   112.0080   -91.8120    -90.0    top       SMD
+C6            0.1uF               C_0805_2012Metric             109.2200   -81.5950   109.2200   -80.6450    -90.0    top       SMD
+C3            1uF                 C_1206_3216Metric             112.7760   -77.7240   112.7760   -76.2490    -90.0    top       SMD
+U1            STM32L031F6Px       TSSOP-20_4.4x6.5mm_P0.65mm    99.0600    -82.5500   96.1975    -79.6250      0.0    top       SMD
+REF**         R_1206_3216Metric   R_1206_3216Metric             102.6160   -93.4720   102.6160   -94.9345     90.0    top       SMD
+REF**         R_1206_3216Metric   R_1206_3216Metric             94.4880    -73.1520   93.0255    -73.1520      0.0    top       SMD
+C4            10uF                C_1210_3225Metric             106.0450   -81.9150   106.0450   -80.4400    -90.0    top       SMD
+SW1           SW_Push             SW_Push_1P1T_NO_CK_KMR2       86.8680    -80.7720   84.8180    -81.5720    180.0    top       SMD
+REF**         R_1206_3216Metric   R_1206_3216Metric             97.5360    -77.2160   96.0735    -77.2160      0.0    top       SMD
+C5            0.1uF               C_0805_2012Metric             92.4560    -81.7880   93.4060    -81.7880    180.0    top       SMD
+C1            0.1 uF              C_0805_2012Metric             93.7260    -76.7080   93.7260    -77.6580     90.0    top       SMD
+R4            100                 R_1206_3216Metric             118.8720   -90.3625   118.8720   -88.9000    -90.0    top       SMD
+## End
