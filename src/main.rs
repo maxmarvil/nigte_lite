@@ -18,7 +18,7 @@ use hal::gpio::{
     gpioa::{PA0, PA1},
     Analog, SignalEdge,
 };
-use hal::stm32::{self, EXTI};
+use hal::stm32::{self, Interrupt, EXTI, NVIC, SYSCFG};
 use hal::{prelude::*, rcc::Config, timer::Timer};
 use rt::{entry, exception, ExceptionFrame};
 use rtt_target::{rprintln, rtt_init_print};
@@ -40,6 +40,7 @@ fn main() -> ! {
     rtt_init_print!();
     rprintln!("start");
     let dp = stm32::Peripherals::take().expect("cannot take peripherals");
+    let cp = cortex_m::Peripherals::take().expect("cannot take core peripherals");
 
     let mut rcc = dp.RCC.freeze(Config::pll());
     let mut exti = dp.EXTI;
@@ -87,6 +88,11 @@ fn main() -> ! {
     //rprintln!("pwm max {}", max);
     let mut set_led_on = false;
     let mut set_led_off = false;
+    let mut nvic = cp.NVIC;
+    unsafe {
+        nvic.set_priority(Interrupt::EXTI4_15, 1);
+        cortex_m::peripheral::NVIC::unmask(Interrupt::EXTI4_15);
+    }
     delay.delay(50.ms());
     loop {
         //pwm_ch1.set_duty(0);
@@ -146,8 +152,8 @@ fn EXTI4_15() {
             use SignalEdge::*;
             let pir_up = exti.is_pending(Event::GPIO6, Rising);
             let pir_down = exti.is_pending(Event::GPIO6, Falling);
-
-            if pir_up && *led_status {
+            rprintln!("pir event {} - {}", pir_up, pir_down);
+            if pir_up && *led_status == false {
                 rprintln!("pir up");
                 *led_status = true;
                 timer.unlisten();
