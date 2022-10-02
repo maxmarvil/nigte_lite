@@ -118,6 +118,7 @@ fn main() -> ! {
                 pwm_ch1.set_duty(duty as u16);
             }
             pwm_ch1.set_duty(max);
+            set_led_on = false;
         }
 
         if set_led_off {
@@ -128,6 +129,7 @@ fn main() -> ! {
                 pwm_ch1.set_duty(duty as u16);
             }
             pwm_ch1.set_duty(0);
+            set_led_off = false;
         }
 
         //rprintln!("pwm {}", max);
