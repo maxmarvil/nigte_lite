@@ -62,11 +62,11 @@
       35,
       36
     ],
-    "visible_layers": "7ffffd3_80000001",
+    "visible_layers": "fffffff_ffffffff",
     "zone_display_mode": 0
   },
   "meta": {
-    "filename": "munlite.kicad_prl",
+    "filename": "munlite_v1.kicad_prl",
     "version": 3
   },
   "project": {

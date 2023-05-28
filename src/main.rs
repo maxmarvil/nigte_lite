@@ -72,6 +72,7 @@ fn main() -> ! {
     pir_pin.listen(SignalEdge::All, &mut exti);
     delay.delay(20.ms());
     let mut opto_pin = gpioa.pa0.into_analog();
+    let mut sens_pin = gpioa.pa1.into_analog();
     pwm_ch1.set_duty(max);
     delay.delay(50.ms());
     pwm_ch1.set_duty(0);
@@ -81,9 +82,9 @@ fn main() -> ! {
         // *LED.borrow(cs).borrow_mut() = Some(led);
         *TIMER.borrow(cs).borrow_mut() = Some(timer);
         *COUNT_D.borrow(cs).borrow_mut() = Some(0);
-        // *ADC.borrow(cs).borrow_mut() = Some(adc);
-        // *OPTOPIN.borrow(cs).borrow_mut() = Some(opto_pin);
-        // *SENSPIN.borrow(cs).borrow_mut() = Some(sens_pin);
+        *ADC.borrow(cs).borrow_mut() = Some(adc);
+        *OPTOPIN.borrow(cs).borrow_mut() = Some(opto_pin);
+        *SENSPIN.borrow(cs).borrow_mut() = Some(sens_pin);
     });
     //rprintln!("pwm max {}", max);
     let mut set_led_on = false;
@@ -134,8 +135,8 @@ fn main() -> ! {
 
         //rprintln!("pwm {}", max);
         delay.delay(200.ms());
-        let opto_value = adc.read_voltage(&mut opto_pin).expect("adc read failed");
-        rprintln!("opto {}", opto_value);
+        //let opto_value = adc.read_voltage(&mut opto_pin).expect("adc read failed");
+        //rprintln!("opto {}", opto_value);
 
         //rprintln!("pwm {}", 0);
         //delay.delay(500.ms());
@@ -146,16 +147,28 @@ fn main() -> ! {
 fn EXTI4_15() {
     rprintln!("pir event");
     cortex_m::interrupt::free(|cs| {
-        if let (&mut Some(ref mut exti), &mut Some(ref mut led_status), &mut Some(ref mut timer)) = (
+        if let (
+            &mut Some(ref mut exti),
+            &mut Some(ref mut led_status),
+            &mut Some(ref mut timer),
+            &mut Some(ref mut adc),
+            &mut Some(ref mut opto_pin),
+            &mut Some(ref mut sens_pin),
+        ) = (
             DEVICE_EXTI.borrow(cs).borrow_mut().deref_mut(),
             LED_STATUS.borrow(cs).borrow_mut().deref_mut(),
             TIMER.borrow(cs).borrow_mut().deref_mut(),
+            ADC.borrow(cs).borrow_mut().deref_mut(),
+            OPTOPIN.borrow(cs).borrow_mut().deref_mut(),
+            SENSPIN.borrow(cs).borrow_mut().deref_mut(),
         ) {
             use SignalEdge::*;
+            let opto_value = adc.read_voltage(opto_pin).expect("adc read failed");
+            let sens_value = adc.read_voltage(sens_pin).expect("adc read failed");
             let pir_up = exti.is_pending(Event::GPIO6, Rising);
             let pir_down = exti.is_pending(Event::GPIO6, Falling);
-            rprintln!("pir event {} - {}", pir_up, pir_down);
-            if pir_up && *led_status == false {
+            rprintln!("pir event {} - {}", opto_value, sens_value);
+            if pir_up && *led_status == false && opto_value < sens_value {
                 rprintln!("pir up");
                 *led_status = true;
                 timer.unlisten();
