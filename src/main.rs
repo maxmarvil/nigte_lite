@@ -4,15 +4,19 @@
 
 //use cortex_m_semihosting::hprintln;
 
-extern crate cortex_m_rt as rt;
-extern crate panic_probe;
-extern crate stm32g0xx_hal as hal;
 
+
+use defmt::*;
+use embassy_executor::Spawner;
+use embassy_stm32::exti::ExtiInput;
+use embassy_stm32::gpio::{Input, Pull};
+use embassy_stm32::adc::{Adc, SampleTime};
+use embassy_time::{Delay, Timer};
+use embassy_stm32::rcc::{AdcClockSource, ClockSrc, Pll, PllM, PllN, PllR, PllSource};
 use core::cell::RefCell;
 use core::ops::DerefMut;
-use cortex_m::asm;
 use cortex_m::interrupt::Mutex;
-use hal::analog::adc::{Adc, OversamplingRatio, Precision, SampleTime};
+//use hal::analog::adc::{Adc, OversamplingRatio, Precision, SampleTime};
 use hal::exti::Event;
 use hal::gpio::{
     gpioa::{PA0, PA1},
@@ -24,6 +28,12 @@ use rt::{entry, exception, ExceptionFrame};
 use rtt_target::{rprintln, rtt_init_print};
 use stm32g0xx_hal::interrupt;
 
+use {defmt_rtt as _, panic_probe as _};
+
+bind_interrupts!(struct Irqs {
+    ADC1_COMP => adc::InterruptHandler<ADC>;
+});
+
 static DEVICE_EXTI: Mutex<RefCell<Option<EXTI>>> = Mutex::new(RefCell::new(None));
 static LED_STATUS: Mutex<RefCell<Option<bool>>> = Mutex::new(RefCell::new(Some(false)));
 static TIMER: Mutex<RefCell<Option<Timer<stm32::TIM14>>>> = Mutex::new(RefCell::new(None));
@@ -34,13 +44,18 @@ static SENSPIN: Mutex<RefCell<Option<PA1<Analog>>>> = Mutex::new(RefCell::new(No
 
 static TIMEOUT: u8 = 4;
 
-#[allow(clippy::empty_loop)]
-#[entry]
+//слушаем прерывания на пине пир-датчика и таймера отвечающего за период светимости
+
+#[embassy_executor::main]
 fn main() -> ! {
-    rtt_init_print!();
-    rprintln!("start");
-    let dp = stm32::Peripherals::take().expect("cannot take peripherals");
-    let cp = cortex_m::Peripherals::take().expect("cannot take core peripherals");
+    let mut config = Config::default();
+    config.rcc.sys_ck = Some(Hertz(48_000_000));
+    config.rcc.adc12_clock_source = AdcClockSource::SYS;
+    let perif = embassy_stm32::init(config);
+
+    // timers adc delay pwm
+    let mut adc = Adc::new(perif.ADC, Irqs, &mut Delay);
+    adc.set_sample_time(SampleTime::Cycles80_5);
 
     let mut rcc = dp.RCC.freeze(Config::pll());
     let mut exti = dp.EXTI;
