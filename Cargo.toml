@@ -3,16 +3,16 @@ authors = ["marvil"]
 edition = "2021"
 readme = "README.md"
 name = "g0_led-j6"
-version = "0.1.0"
+version = "0.1.1"
 
 [dependencies]
-cortex-m = "0.6.7"
-cortex-m-rt = "0.6.10"
-cortex-m-semihosting = "0.3.3"
-panic-semihosting = "0.5.6"
-panic-probe = { version = "0.2", features = ["print-rtt"] }
+cortex-m = "0.7.7"
+cortex-m-rt = "0.7.5"
+cortex-m-semihosting = "0.5.0"
+panic-semihosting = "0.6.0"
+panic-probe = { version = "1.0.0", features = ["print-rtt"] }
 stm32g0xx-hal = { git="https://github.com/stm32-rs/stm32g0xx-hal.git", features = ["rt", "stm32g031", "stm32g0x1"] }# For the stm32g031k8 mc  ,version = "0.1.5",
-rtt-target =  { version = "0.3.1", features = ["cortex-m"] }
+rtt-target =  { version = "0.6.1", features = [] }
 
 
 # Uncomment for the panic example.
